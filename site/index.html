@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>schedule-agent — self-hosted Motion, minus the subscription</title>
+<meta name="description" content="Reads your tasks, respects your calendar, and pings you when something's at risk. Runs on your Mac. Open source, MIT-licensed, bring your own Anthropic key.">
+<meta name="theme-color" content="#1d1a17">
+<meta property="og:title" content="schedule-agent">
+<meta property="og:description" content="A self-hosted constraint-solving scheduler. Motion-style, minus the subscription.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --canvas:      oklch(0.12 0.006 60);
+    --canvas-2:    oklch(0.14 0.006 60);
+    --surface:     oklch(0.17 0.008 60);
+    --border:      oklch(0.26 0.010 60);
+    --border-soft: oklch(0.20 0.008 60);
+    --ink-1:       oklch(0.96 0.010 80);
+    --ink-2:       oklch(0.70 0.015 70);
+    --ink-3:       oklch(0.50 0.015 70);
+    --accent:      oklch(0.82 0.14 75);
+    --accent-quiet: oklch(0.30 0.06 75);
+    --accent-on:   oklch(0.14 0.025 75);
+
+    --font-display: "Bricolage Grotesque", -apple-system, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+    --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+    --space-5: 24px; --space-6: 32px; --space-8: 48px; --space-10: 64px;
+    --space-12: 96px; --space-16: 128px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    background: var(--canvas); color: var(--ink-1);
+    font-family: var(--font-display);
+    font-size: 17px; line-height: 1.6;
+    font-weight: 400; font-optical-sizing: auto;
+  }
+  ::selection { background: var(--accent); color: var(--accent-on); }
+
+  a { color: var(--ink-1); text-decoration: none;
+      border-bottom: 1px solid var(--border);
+      transition: border-color 160ms var(--ease-out), color 160ms var(--ease-out); }
+  a:hover { border-color: var(--accent); color: var(--accent); }
+
+  code {
+    font-family: var(--font-mono); font-size: 0.88em;
+    background: var(--surface); color: var(--ink-1);
+    padding: 2px 6px; border-radius: 3px;
+  }
+  pre {
+    font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7;
+    background: var(--canvas-2); color: var(--ink-1);
+    border: 1px solid var(--border-soft); border-radius: 8px;
+    padding: 16px 18px; overflow-x: auto;
+  }
+  pre code { background: transparent; padding: 0; }
+
+  /* ---------- layout primitives ---------- */
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+  .row { display: grid; gap: var(--space-6); }
+  @media (min-width: 840px) {
+    .row-split  { grid-template-columns: 5fr 7fr; align-items: baseline; }
+    .row-label  { grid-template-columns: 3fr 9fr; align-items: baseline; }
+  }
+
+  /* ---------- navigation ---------- */
+  nav.top {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border-soft);
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in oklch, var(--canvas) 92%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  nav.top .wrap { display: flex; justify-content: space-between; align-items: center; }
+  nav.top .brand {
+    font-weight: 600; font-size: 16px; letter-spacing: -0.01em;
+    border: 0;
+  }
+  nav.top .brand .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 999px;
+    background: var(--accent); margin-right: 8px; transform: translateY(-2px);
+  }
+  nav.top .nav-links { display: flex; gap: 24px; font-size: 14px; }
+  nav.top .nav-links a { color: var(--ink-2); border: 0; }
+  nav.top .nav-links a:hover { color: var(--ink-1); }
+  @media (max-width: 640px) { nav.top .nav-links { display: none; } }
+
+  /* ---------- hero ---------- */
+  header.hero { padding: clamp(72px, 14vw, 140px) 0 clamp(64px, 10vw, 112px); }
+  header.hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    color: var(--accent); letter-spacing: 0.02em;
+    margin-bottom: 28px;
+  }
+  header.hero .eyebrow::before {
+    content: ""; width: 6px; height: 6px; border-radius: 999px;
+    background: var(--accent); display: inline-block;
+  }
+  header.hero h1 {
+    font-size: clamp(40px, 6vw, 76px); font-weight: 500;
+    line-height: 1.02; letter-spacing: -0.035em;
+    max-width: 16ch;
+    margin-bottom: 28px;
+  }
+  header.hero h1 em {
+    font-style: normal; font-weight: 400; color: var(--ink-2);
+  }
+  header.hero .lede {
+    font-size: clamp(18px, 2vw, 21px); color: var(--ink-2);
+    max-width: 58ch; line-height: 1.55;
+    margin-bottom: 40px;
+  }
+  .btns { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-display); font-weight: 500;
+    font-size: 15px; padding: 13px 22px; border-radius: 8px;
+    cursor: pointer; border: 1px solid transparent;
+    transition: transform 160ms var(--ease-out),
+                background 200ms var(--ease-out),
+                border-color 200ms var(--ease-out),
+                color 200ms var(--ease-out);
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: var(--accent-on); }
+  .btn-primary:hover { filter: brightness(1.05); color: var(--accent-on); }
+  .btn-ghost { color: var(--ink-1); border-color: var(--border); }
+  .btn-ghost:hover { border-color: var(--ink-2); color: var(--ink-1); }
+  .btn .arrow { transition: transform 180ms var(--ease-out); }
+  .btn:hover .arrow { transform: translateX(3px); }
+  header.hero .fineprint {
+    margin-top: 24px; font-size: 14px; color: var(--ink-3);
+  }
+
+  /* ---------- sections ---------- */
+  section { padding: clamp(64px, 10vw, 112px) 0; border-top: 1px solid var(--border-soft); }
+  section .label {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  section h2 {
+    font-size: clamp(28px, 4vw, 44px); font-weight: 500;
+    line-height: 1.08; letter-spacing: -0.025em;
+    margin-top: 8px; max-width: 22ch;
+  }
+  section h2 em { font-style: normal; color: var(--ink-2); font-weight: 400; }
+  section p.body { color: var(--ink-2); font-size: 17px; max-width: 58ch; line-height: 1.65; }
+  section p.body + p.body { margin-top: 18px; }
+
+  /* ---------- features (asymmetric rhythm, not a uniform grid) ---------- */
+  .features { margin-top: 48px; display: grid; gap: 4px; }
+  .feature {
+    display: grid; grid-template-columns: 3fr 9fr;
+    gap: var(--space-6); padding: 28px 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .feature:last-child { border-bottom: 0; }
+  .feature .idx {
+    font-family: var(--font-mono); font-size: 12px; color: var(--ink-3);
+    padding-top: 4px;
+  }
+  .feature h4 {
+    font-size: 19px; font-weight: 500; letter-spacing: -0.01em;
+    margin-bottom: 6px;
+  }
+  .feature p { color: var(--ink-2); font-size: 16px; line-height: 1.6; max-width: 62ch; }
+  @media (max-width: 680px) {
+    .feature { grid-template-columns: 1fr; gap: 8px; }
+    .feature .idx { padding-top: 0; }
+  }
+
+  /* ---------- compare ---------- */
+  .compare {
+    margin-top: 48px;
+    display: grid; gap: var(--space-5);
+  }
+  @media (min-width: 760px) { .compare { grid-template-columns: 1fr 1fr; } }
+  .compare article {
+    padding: 28px 28px 24px;
+    border: 1px solid var(--border-soft); border-radius: 10px;
+    background: var(--canvas-2);
+  }
+  .compare article.highlight {
+    border-color: var(--accent-quiet); background: var(--surface);
+  }
+  .compare h5 {
+    font-size: 13px; font-family: var(--font-mono); font-weight: 500;
+    color: var(--ink-3); margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .compare .title {
+    font-size: 22px; font-weight: 500; letter-spacing: -0.01em;
+    margin-bottom: 16px;
+  }
+  .compare ul { list-style: none; }
+  .compare li {
+    padding: 9px 0; color: var(--ink-2); font-size: 15px; line-height: 1.55;
+    display: grid; grid-template-columns: 16px 1fr; gap: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .compare li:last-child { border-bottom: 0; }
+  .compare li::before {
+    content: ""; width: 16px; height: 1px; background: var(--ink-3);
+    align-self: center;
+  }
+  .compare article.highlight li::before { background: var(--accent); height: 2px; }
+
+  /* ---------- install paths ---------- */
+  .paths { margin-top: 40px; display: grid; gap: 32px; }
+  .path {
+    display: grid; grid-template-columns: auto 1fr; gap: 24px;
+    padding-top: 28px; border-top: 1px solid var(--border-soft);
+  }
+  .path:first-child { border-top: 0; padding-top: 0; }
+  .path .num {
+    font-family: var(--font-mono); font-size: 12px; color: var(--accent);
+    padding-top: 5px; min-width: 28px;
+  }
+  .path h4 {
+    font-size: 21px; font-weight: 500; letter-spacing: -0.015em;
+    margin-bottom: 8px;
+  }
+  .path h4 .pill {
+    margin-left: 10px; font-family: var(--font-mono); font-size: 11px;
+    color: var(--ink-3); font-weight: 500; letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px;
+    background: transparent; vertical-align: middle;
+  }
+  .path p { color: var(--ink-2); font-size: 16px; max-width: 62ch; }
+  .path pre { margin-top: 16px; max-width: 620px; }
+  @media (max-width: 560px) { .path { grid-template-columns: 1fr; gap: 8px; } }
+
+  /* ---------- small helpers ---------- */
+  .prereqs { margin-top: 40px; display: grid; gap: 20px; }
+  @media (min-width: 640px) { .prereqs { grid-template-columns: repeat(3, 1fr); } }
+  .prereq h5 {
+    font-size: 15px; font-weight: 500; margin-bottom: 6px;
+  }
+  .prereq p {
+    color: var(--ink-2); font-size: 14px; line-height: 1.55;
+  }
+
+  /* ---------- footer ---------- */
+  footer { padding: 72px 0 96px; border-top: 1px solid var(--border-soft); }
+  footer .foot {
+    display: flex; justify-content: space-between; align-items: baseline;
+    flex-wrap: wrap; gap: 16px;
+    color: var(--ink-3); font-size: 14px;
+  }
+  footer .doc-links { display: flex; gap: 16px; flex-wrap: wrap; }
+  footer .doc-links a { color: var(--ink-2); border-bottom-color: transparent; }
+  footer .doc-links a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ---------- reveal animation ---------- */
+  .reveal { opacity: 0; transform: translateY(16px); }
+  .reveal.in-view {
+    opacity: 1; transform: translateY(0);
+    transition: opacity 500ms var(--ease-out), transform 500ms var(--ease-out);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; }
+    .reveal.in-view { transition: none; }
+    a, .btn, .btn .arrow { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="dot"></span>schedule-agent</a>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/YOUR-HANDLE/schedule-agent-public" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="eyebrow">v0.1 · MIT · bring your own API key</div>
+      <h1>A scheduler that plans your week, <em>not just your inbox.</em></h1>
+      <p class="lede">
+        Reads tasks from Canvas or your todo app, places them around your
+        classes and meetings with a deterministic solver, and pings you
+        when something's slipping. Runs on your Mac. Data stays local.
+      </p>
+      <div class="btns">
+        <a class="btn btn-primary" href="#install">Install <span class="arrow">→</span></a>
+        <a class="btn btn-ghost" href="https://github.com/YOUR-HANDLE/schedule-agent-public" target="_blank" rel="noopener">Read the source</a>
+      </div>
+      <p class="fineprint">macOS, Linux, and Docker. Windows desktop app coming later.</p>
+    </div>
+  </div>
+</header>
+
+<section id="why">
+  <div class="wrap">
+    <div class="row row-label reveal">
+      <span class="label">01 · the premise</span>
+      <div>
+        <h2>Paying $34/month for scheduling <em>is wild</em> when the math is a few hundred lines of Python.</h2>
+        <p class="body">
+          Motion and Reclaim figured out something real: placing tasks around
+          your fixed time is a constraint problem, and solving it for you is
+          genuinely useful. Charging a subscription to do math on your own
+          calendar is the part that doesn't survive scrutiny.
+        </p>
+        <p class="body">
+          This is that solver, wrapped in a small hub you can open from any
+          browser on your machine. Your tasks live in SQLite on your laptop.
+          Your calendar sits on iCloud. Your API key is your business. The
+          code is MIT-licensed and boring — no startup, no telemetry, no cloud
+          component you can't see.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="row row-label">
+      <span class="label reveal">02 · what it does</span>
+      <div class="reveal">
+        <h2>Six things, each honest about its job.</h2>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature reveal">
+        <span class="idx">01</span>
+        <div>
+          <h4>Deterministic solver</h4>
+          <p>Greedy placement with chunk splitting, deadline pressure, priority tiers, and an overdue-tolerant fallback. Math, not vibes. Never schedules during class.</p>
+        </div>
+      </div>
+      <div class="feature reveal">
+        <span class="idx">02</span>
+        <div>
+          <h4>Pluggable providers</h4>
+          <p>Canvas LMS, iCloud CalDAV, Apple Reminders, iMessage, ntfy.sh shipped. Each is one Python class against a small ABC. Adding Google Calendar or Todoist is a file, not a rewrite.</p>
+        </div>
+      </div>
+      <div class="feature reveal">
+        <span class="idx">03</span>
+        <div>
+          <h4>Review gate, optional</h4>
+          <p>Turn on <code>require_approval</code> per source and new tasks land in a pending queue before they hit your calendar. Good for noisy LMS or when you're letting the agent draft tasks from incoming messages.</p>
+        </div>
+      </div>
+      <div class="feature reveal">
+        <span class="idx">04</span>
+        <div>
+          <h4>Anthropic agent, also optional</h4>
+          <p>Tell it "ENGL essay due Friday, ~90 minutes" and it files the task. The LLM handles intake and daily summaries; the deterministic solver handles placement. You can run the hub without the agent if you want.</p>
+        </div>
+      </div>
+      <div class="feature reveal">
+        <span class="idx">05</span>
+        <div>
+          <h4>SQLite, all of it</h4>
+          <p>Task history, solver log, agent session transcripts — all persist. Restart the process, redeploy the container, reinstall the app: your history survives. No managed service anywhere.</p>
+        </div>
+      </div>
+      <div class="feature reveal">
+        <span class="idx">06</span>
+        <div>
+          <h4>A hub, not a dashboard</h4>
+          <p>One page. Tasks, solver activity, live agent streams, approve/reject, manual add. Single file of vanilla JS, no build step. Open <code>localhost:8787</code>, bookmark it, close the terminal.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <div class="row row-label">
+      <span class="label reveal">03 · how it compares</span>
+      <div class="reveal">
+        <h2>Two different trades. <em>Both valid.</em></h2>
+        <p class="body" style="margin-top:18px">
+          Motion-style tools are paying for themselves by running your
+          scheduling in their cloud. That's a real service, and there's
+          nothing wrong with paying for it. But it's worth being explicit
+          about what you're trading for.
+        </p>
+      </div>
+    </div>
+
+    <div class="compare">
+      <article class="highlight reveal">
+        <h5>This</h5>
+        <div class="title">schedule-agent</div>
+        <ul>
+          <li>$0/mo infra, ~$5/mo in API tokens</li>
+          <li>All data local, on your own machine</li>
+          <li>iCloud + Canvas + iMessage out of the box</li>
+          <li>Open source, MIT, audit-friendly</li>
+          <li>New integration = one file</li>
+          <li>You run your own Mac, Linux host, or container</li>
+        </ul>
+      </article>
+      <article class="reveal">
+        <h5>The alternative</h5>
+        <div class="title">Motion, Reclaim, TimeHero</div>
+        <ul>
+          <li>$19 – $34/month</li>
+          <li>Tasks and calendar copies live in the vendor's cloud</li>
+          <li>Opinionated integrations; no LMS support</li>
+          <li>Closed source</li>
+          <li>New integration happens on their roadmap</li>
+          <li>Zero hosting on your side</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="row row-label">
+      <span class="label reveal">04 · install</span>
+      <div class="reveal">
+        <h2>Three ways in. <em>Same app.</em></h2>
+        <p class="body" style="margin-top:18px">
+          Pick based on how deep you want to go. The wizard is the same in
+          all three — it writes a <code>.env</code>, creates your Anthropic
+          agent, and drops you at the hub.
+        </p>
+      </div>
+    </div>
+
+    <div class="paths">
+      <div class="path reveal">
+        <span class="num">01</span>
+        <div>
+          <h4>Terminal, one command <span class="pill">fastest</span></h4>
+          <p>
+            Clone, make a venv, run the wizard in your browser. No
+            packaging, no Gatekeeper warnings. This is how I run it.
+          </p>
+<pre><code>git clone https://github.com/YOUR-HANDLE/schedule-agent-public
+cd schedule-agent-public
+python3 -m venv venv &amp;&amp; source venv/bin/activate
+pip install -r requirements.txt
+python run.py</code></pre>
+        </div>
+      </div>
+
+      <div class="path reveal">
+        <span class="num">02</span>
+        <div>
+          <h4>Docker <span class="pill">headless</span></h4>
+          <p>
+            Self-contained image. Mount <code>.env</code> and
+            <code>state.db</code> as volumes. Good for VPS or a home server.
+          </p>
+<pre><code>docker compose up -d --build</code></pre>
+          <p style="margin-top:16px">
+            See <a href="https://github.com/YOUR-HANDLE/schedule-agent-public/blob/main/docs/deployment.md">docs/deployment.md</a>
+            for the systemd-on-Linux path too.
+          </p>
+        </div>
+      </div>
+
+      <div class="path reveal">
+        <span class="num">03</span>
+        <div>
+          <h4>macOS app <span class="pill">double-click</span></h4>
+          <p>
+            Packaged bundle. No Python, no Terminal. Unsigned for now —
+            macOS will show a "cannot verify developer" warning on first
+            launch. Right-click → Open to get past it. One click, forever.
+            Code signing ($99/year to Apple) lands when the project earns it.
+          </p>
+          <p style="margin-top:16px; color: var(--ink-3);">
+            Download coming shortly. Build recipe lives at
+            <code>packaging/macos/</code> if you want to roll your own now.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="prereqs">
+      <div class="prereq reveal">
+        <h5>An Anthropic key</h5>
+        <p>≈$5/mo for a typical student workload. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
+      </div>
+      <div class="prereq reveal">
+        <h5>A calendar</h5>
+        <p>iCloud works out of the box: your primary Apple ID email and an app-specific password from appleid.apple.com.</p>
+      </div>
+      <div class="prereq reveal">
+        <h5>A task source <em style="color:var(--ink-3);font-style:normal">(optional)</em></h5>
+        <p>Canvas now. Notion / GitHub / Linear / Todoist are ~100 lines each — <a href="https://github.com/YOUR-HANDLE/schedule-agent-public/blob/main/docs/providers.md">providers.md</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <p style="margin-bottom: 8px;">MIT-licensed. Built by Eytan Luria, with help from Claude.</p>
+        <p style="color: var(--ink-3); font-size: 13px;">Not affiliated with Motion, Apple, Canvas, or Anthropic.</p>
+      </div>
+      <div class="doc-links">
+        <a href="https://github.com/YOUR-HANDLE/schedule-agent-public/blob/main/docs/getting-started.md">Getting started</a>
+        <a href="https://github.com/YOUR-HANDLE/schedule-agent-public/blob/main/docs/providers.md">Providers</a>
+        <a href="https://github.com/YOUR-HANDLE/schedule-agent-public/blob/main/docs/deployment.md">Deploy</a>
+        <a href="https://github.com/YOUR-HANDLE/schedule-agent-public/blob/main/docs/troubleshooting.md">Troubleshooting</a>
+        <a href="https://github.com/YOUR-HANDLE/schedule-agent-public/blob/main/ROADBLOCKS.md">Build log</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Scroll-entry reveal — IntersectionObserver, respects prefers-reduced-motion.
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reveals = document.querySelectorAll(".reveal");
+  if (reduceMotion) {
+    reveals.forEach(el => el.classList.add("in-view"));
+  } else {
+    const io = new IntersectionObserver((entries) => {
+      let delay = 0;
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.style.transitionDelay = `${delay}ms`;
+          entry.target.classList.add("in-view");
+          delay += 50; // subtle stagger within a viewport
+          io.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: "-40px 0px -10% 0px", threshold: 0.05 });
+    reveals.forEach(el => io.observe(el));
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,40 @@
+; systemd unit template for Linux hosts running schedule-agent directly
+; (without Docker). Copy to /etc/systemd/system/schedule-agent.service,
+; replace the placeholders below, then:
+;
+;   systemctl daemon-reload
+;   systemctl enable --now schedule-agent
+;
+; Placeholders:
+;   <USER>       — the Linux user who owns the checkout (e.g. schedule)
+;   <REPO>       — absolute path to the repo (e.g. /srv/schedule-agent-public)
+;
+; The service reads its environment from <REPO>/.env, bound via EnvironmentFile.
+; State (state.db, learning_state.json) lives in <REPO> — make sure that path
+; is writable by <USER>.
+
+[Unit]
+Description=schedule-agent orchestrator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<USER>
+Group=<USER>
+WorkingDirectory=<REPO>
+EnvironmentFile=<REPO>/.env
+ExecStart=<REPO>/venv/bin/python orchestrator.py
+Restart=always
+RestartSec=5
+
+; Hardening — enable as appropriate for your host. Commented out so the
+; template works out-of-the-box; most deployments should turn these on.
+; NoNewPrivileges=true
+; ProtectSystem=strict
+; ProtectHome=read-only
+; ReadWritePaths=<REPO>
+; PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

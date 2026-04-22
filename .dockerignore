@@ -1,0 +1,37 @@
+# Never bake these into the image.
+.env
+.env.local
+*.secret
+
+# Local SQLite state — must be a mounted volume, not a built-in layer.
+state.db
+state.db-journal
+state.db-wal
+state.db-shm
+learning_state.json
+last_morning_date.txt
+data/
+
+# macOS-only runtime bits.
+macos/reminders_fetch
+
+# Dev / CI noise.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+venv/
+.venv/
+env/
+tests/
+.github/
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# VCS
+.git
+.gitignore

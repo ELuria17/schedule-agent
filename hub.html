@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>Agent Hub</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --fg: #ededed;
+    --muted: #8a8a8a;
+    --card: #161616;
+    --border: #262626;
+    --accent: #6ee7b7;
+    --error: #f87171;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom) }
+  header { padding: 20px 0 16px; display: flex; align-items: baseline; gap: 12px; }
+  header h1 { margin: 0; font-size: 20px; font-weight: 600 }
+  header .sub { color: var(--muted); font-size: 13px }
+  section { margin-bottom: 24px }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 8px; font-weight: 600 }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px }
+  .agent-row { display: flex; align-items: center; gap: 12px }
+  .agent-row .meta { flex: 1; min-width: 0 }
+  .agent-row .name { font-weight: 600 }
+  .agent-row .desc { color: var(--muted); font-size: 13px; margin-top: 2px }
+  .agent-row .last { color: var(--muted); font-size: 12px; margin-top: 4px }
+  button {
+    background: var(--accent); color: #0a0a0a; border: 0; border-radius: 8px;
+    padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  .pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--border); color: var(--fg); }
+  .pill.running { background: #0f3a2a; color: var(--accent) }
+  .pill.error { background: #3a1010; color: var(--error) }
+  .pill.done { background: #1a1a1a; color: var(--muted) }
+  .timeline { display: flex; flex-direction: column; gap: 6px }
+  .event {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; font-size: 14px;
+  }
+  .event .ts { color: var(--muted); font-size: 11px; margin-right: 8px; font-variant-numeric: tabular-nums }
+  .event.message { border-left: 3px solid var(--accent) }
+  .event.thinking { border-left: 3px solid #a78bfa; font-style: italic; color: var(--muted); white-space: pre-wrap; max-height: 120px; overflow: hidden }
+  .event.tool { border-left: 3px solid #60a5fa; }
+  .event.tool.error { border-left-color: var(--error) }
+  .event.status { border-left: 3px solid var(--muted) }
+  .event.error { border-left: 3px solid var(--error); color: var(--error) }
+  .event .text { white-space: pre-wrap; word-wrap: break-word }
+  .event summary { cursor: pointer; user-select: none; list-style: none }
+  .event summary::-webkit-details-marker { display: none }
+  .event details pre { margin: 8px 0 0; padding: 8px; background: #0a0a0a; border-radius: 6px; overflow-x: auto; font-size: 12px; color: var(--muted); max-height: 240px }
+  .session-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; padding: 10px 12px }
+  .session-item:hover { background: #1c1c1c }
+  .session-item .title { font-weight: 500; font-size: 14px }
+  .session-item .meta { color: var(--muted); font-size: 12px; margin-top: 2px }
+  .loading { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center }
+  code { background: #1a1a1a; padding: 1px 5px; border-radius: 4px; font-size: 12px }
+  .empty { color: var(--muted); font-style: italic; font-size: 13px }
+
+  /* Tasks */
+  .task-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--border) }
+  .task-row:first-child { border-top: 0 }
+  .task-row.at-risk { background: #2a1010 }
+  .task-row .body { flex: 1; min-width: 0 }
+  .task-row .title { font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 6px }
+  .task-row .meta { color: var(--muted); font-size: 12px; margin-top: 2px; display: flex; gap: 10px; flex-wrap: wrap }
+  .task-row button { font-size: 12px; padding: 5px 10px }
+  .task-row .done { background: var(--border); color: var(--fg) }
+  .pill.asap { background: #3a1010; color: var(--error) }
+  .pill.high { background: #3a2810; color: var(--warn) }
+  .pill.medium { background: #1a2a3a; color: #93c5fd }
+  .pill.low { background: #1a1a1a; color: var(--muted) }
+  .pill.at-risk { background: var(--error); color: #0a0a0a; font-weight: 700 }
+  .add-task {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px;
+    border-top: 1px solid var(--border); background: #101010; align-items: center;
+  }
+  .add-task input {
+    background: #0a0a0a; border: 1px solid var(--border); color: var(--fg);
+    padding: 6px 8px; border-radius: 6px; font: inherit; font-size: 13px;
+  }
+  .add-task input[type="text"] { flex: 1; min-width: 180px }
+  .add-task input[type="number"] { width: 80px }
+  .add-task select {
+    background: #0a0a0a; color: var(--fg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 13px;
+  }
+
+  /* Solver activity strip */
+  .solver-runs { font-size: 12px; color: var(--muted); padding: 10px 14px }
+  .solver-runs .run { display: flex; gap: 10px; padding: 2px 0 }
+  .solver-runs .run .ts { font-variant-numeric: tabular-nums; min-width: 54px }
+  .solver-runs .run .trigger { color: var(--fg); min-width: 90px }
+  .solver-runs .run.error { color: var(--error) }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 Agent Hub</h1>
+  <span class="sub" id="status">connecting…</span>
+</header>
+
+<section id="pending-section" style="display:none">
+  <h2>Pending review
+    <span class="sub" id="pending-summary" style="font-weight:400;color:var(--muted);font-size:12px;margin-left:6px"></span>
+    <button class="ghost" id="approve-all" style="float:right;font-size:12px;padding:5px 10px">Approve all</button>
+  </h2>
+  <div id="pending" class="card" style="padding:0"></div>
+</section>
+
+<section id="tasks-section">
+  <h2>Tasks
+    <span class="sub" id="tasks-summary" style="font-weight:400;color:var(--muted);font-size:12px;margin-left:6px"></span>
+    <button class="ghost" id="sync-now" style="float:right;font-size:12px;padding:5px 10px">Sync Canvas now</button>
+  </h2>
+  <div id="tasks" class="card" style="padding:0"></div>
+</section>
+
+<section id="solver-section">
+  <h2>Solver activity</h2>
+  <div id="solver-runs" class="card solver-runs"></div>
+</section>
+
+<section id="agents-section">
+  <h2>Agents</h2>
+  <div id="agents"></div>
+</section>
+
+<section id="live-section" style="display:none">
+  <h2>Live <span id="live-status" class="pill running">running</span></h2>
+  <div id="timeline" class="timeline"></div>
+</section>
+
+<section id="history-section">
+  <h2>Recent sessions</h2>
+  <div id="sessions" class="card" style="padding:0"></div>
+</section>
+
+<script>
+const $ = s => document.querySelector(s);
+const agentsEl = $('#agents');
+const timelineEl = $('#timeline');
+const liveSection = $('#live-section');
+const liveStatus = $('#live-status');
+const sessionsEl = $('#sessions');
+const tasksEl = $('#tasks');
+const tasksSummaryEl = $('#tasks-summary');
+const pendingEl = $('#pending');
+const pendingSectionEl = $('#pending-section');
+const pendingSummaryEl = $('#pending-summary');
+const solverRunsEl = $('#solver-runs');
+const statusEl = $('#status');
+let activeEvtSource = null;
+let activeSessionId = null;
+
+async function refreshTasks() {
+  const r = await fetch('/api/tasks', { credentials: 'same-origin' });
+  if (!r.ok) { tasksSummaryEl.textContent = 'error'; return; }
+  const { tasks, total } = await r.json();
+  const atRiskCount = tasks.filter(t => t.at_risk).length;
+  const doneSuffix = atRiskCount ? ` · ${atRiskCount} at risk` : '';
+  tasksSummaryEl.textContent = `${total} active${doneSuffix}`;
+  tasksEl.innerHTML = '';
+
+  // Quick-add form
+  const form = document.createElement('div');
+  form.className = 'add-task';
+  form.innerHTML = `
+    <input type="text" id="nt-title" placeholder="Task title (e.g., 'ECON HW 8')" />
+    <input type="number" id="nt-dur" placeholder="min" min="5" value="60" />
+    <input type="text" id="nt-course" placeholder="course (optional)" style="width:120px" />
+    <input type="datetime-local" id="nt-deadline" />
+    <select id="nt-pri">
+      <option value="medium" selected>medium</option>
+      <option value="asap">asap</option>
+      <option value="high">high</option>
+      <option value="low">low</option>
+    </select>
+    <button id="nt-add">+ Add</button>`;
+  tasksEl.appendChild(form);
+  document.getElementById('nt-add').addEventListener('click', addTask);
+
+  if (!tasks.length) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:14px 12px';
+    empty.className = 'empty';
+    empty.textContent = 'No active tasks. Add one above, or let a solver run pull from Canvas.';
+    tasksEl.appendChild(empty);
+    return;
+  }
+
+  for (const t of tasks) {
+    const row = document.createElement('div');
+    row.className = 'task-row' + (t.at_risk ? ' at-risk' : '');
+    const deadline = t.deadline_ts ? new Date(t.deadline_ts) : null;
+    const deadlineStr = deadline ? deadline.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'no deadline';
+    const riskPill = t.at_risk ? '<span class="pill at-risk">AT RISK</span>' : '';
+    row.innerHTML = `
+      <div class="body">
+        <div class="title">
+          <span class="pill ${escapeHtml(t.priority)}">${escapeHtml(t.priority)}</span>
+          ${riskPill}
+          <span>${escapeHtml(t.title)}</span>
+        </div>
+        <div class="meta">
+          ${t.course ? `<span>${escapeHtml(t.course)}</span>` : ''}
+          <span>${t.duration_min} min</span>
+          <span>due ${deadlineStr}</span>
+          <span>${t.chunks.length} chunk${t.chunks.length === 1 ? '' : 's'} placed</span>
+          <span style="opacity:0.6">src: ${escapeHtml(t.source)}</span>
+        </div>
+      </div>
+      <button class="done" data-id="${t.id}">✓</button>
+      <button class="ghost del" data-id="${t.id}" title="Delete">×</button>`;
+    row.querySelector('.done').addEventListener('click', () => completeTask(t.id));
+    row.querySelector('.del').addEventListener('click', () => deleteTask(t.id));
+    tasksEl.appendChild(row);
+  }
+}
+
+async function refreshPending() {
+  const r = await fetch('/api/tasks/pending', { credentials: 'same-origin' });
+  if (!r.ok) { pendingSectionEl.style.display = 'none'; return; }
+  const { tasks, total } = await r.json();
+  if (!total) { pendingSectionEl.style.display = 'none'; return; }
+  pendingSectionEl.style.display = '';
+  pendingSummaryEl.textContent = `${total} waiting for your approval`;
+  pendingEl.innerHTML = '';
+  for (const t of tasks) {
+    const row = document.createElement('div');
+    row.className = 'task-row';
+    const deadline = t.deadline_ts ? new Date(t.deadline_ts) : null;
+    const deadlineStr = deadline
+      ? deadline.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : 'no deadline';
+    row.innerHTML = `
+      <div class="body">
+        <div class="title">
+          <span class="pill ${escapeHtml(t.priority)}">${escapeHtml(t.priority)}</span>
+          <span>${escapeHtml(t.title)}</span>
+        </div>
+        <div class="meta">
+          ${t.course ? `<span>${escapeHtml(t.course)}</span>` : ''}
+          <span>${t.duration_min} min</span>
+          <span>due ${deadlineStr}</span>
+          <span style="opacity:0.6">src: ${escapeHtml(t.source)}</span>
+        </div>
+      </div>
+      <button class="approve" data-id="${t.id}" title="Approve">✓</button>
+      <button class="ghost reject" data-id="${t.id}" title="Reject">×</button>`;
+    row.querySelector('.approve').addEventListener('click', () => approveTask(t.id));
+    row.querySelector('.reject').addEventListener('click', () => rejectTask(t.id));
+    pendingEl.appendChild(row);
+  }
+}
+
+async function approveTask(id) {
+  await fetch(`/api/tasks/${id}/approve`, { method: 'POST', credentials: 'same-origin' });
+  refreshPending();
+  refreshTasks();
+}
+
+async function rejectTask(id) {
+  await fetch(`/api/tasks/${id}/reject`, { method: 'POST', credentials: 'same-origin' });
+  refreshPending();
+}
+
+async function approveAllPending() {
+  const r = await fetch('/api/tasks/pending', { credentials: 'same-origin' });
+  if (!r.ok) return;
+  const { tasks } = await r.json();
+  await Promise.all(tasks.map(t =>
+    fetch(`/api/tasks/${t.id}/approve`, { method: 'POST', credentials: 'same-origin' })
+  ));
+  refreshPending();
+  refreshTasks();
+}
+
+async function addTask() {
+  const title = document.getElementById('nt-title').value.trim();
+  const dur = parseInt(document.getElementById('nt-dur').value, 10);
+  const course = document.getElementById('nt-course').value.trim() || null;
+  const deadlineLocal = document.getElementById('nt-deadline').value;
+  const pri = document.getElementById('nt-pri').value;
+  if (!title || !dur) { alert('Title + duration required'); return; }
+  const body = {
+    title, duration_min: dur, priority: pri, course,
+    deadline_ts: deadlineLocal ? new Date(deadlineLocal).toISOString() : null,
+  };
+  statusEl.textContent = 'adding task…';
+  const r = await fetch('/api/tasks', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { statusEl.textContent = 'add failed: ' + r.status; return; }
+  document.getElementById('nt-title').value = '';
+  document.getElementById('nt-deadline').value = '';
+  statusEl.textContent = 'task added (solver re-running in background)';
+  await refreshTasks();
+}
+
+async function completeTask(id) {
+  await fetch(`/api/tasks/${id}/complete`, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  refreshTasks();
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  await fetch(`/api/tasks/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+  refreshTasks();
+}
+
+async function refreshSolverRuns() {
+  const r = await fetch('/api/solver/log', { credentials: 'same-origin' });
+  if (!r.ok) return;
+  const { runs } = await r.json();
+  solverRunsEl.innerHTML = '';
+  if (!runs.length) {
+    solverRunsEl.innerHTML = '<div class="empty">No solver runs yet.</div>';
+    return;
+  }
+  for (const run of runs.slice(0, 6)) {
+    const row = document.createElement('div');
+    row.className = 'run' + (run.error ? ' error' : '');
+    const ts = new Date(run.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (run.error) {
+      row.innerHTML = `<span class="ts">${ts}</span><span class="trigger">[${escapeHtml(run.trigger)}]</span><span>error: ${escapeHtml(run.error)}</span>`;
+    } else {
+      const bits = [`${run.chunks} chunks`];
+      if (run.at_risk) bits.push(`${run.at_risk} at risk`);
+      if (run.sync_summary) {
+        const ss = run.sync_summary;
+        if (ss.canvas_upserts) bits.push(`canvas +${ss.canvas_upserts}`);
+        if (ss.canvas_mark_done) bits.push(`canvas ✓${ss.canvas_mark_done}`);
+        if (ss.reminder_matches) bits.push(`rem ✓${ss.reminder_matches}`);
+      }
+      row.innerHTML = `<span class="ts">${ts}</span><span class="trigger">[${escapeHtml(run.trigger)}]</span><span>${bits.join(' · ')}</span>`;
+    }
+    solverRunsEl.appendChild(row);
+  }
+}
+
+async function refreshAgents() {
+  const r = await fetch('/api/agents', { credentials: 'same-origin' });
+  if (!r.ok) { statusEl.textContent = 'auth failed'; return; }
+  const { agents } = await r.json();
+  agentsEl.innerHTML = '';
+  for (const a of agents) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="agent-row">
+        <div class="meta">
+          <div class="name">${a.name}</div>
+          <div class="desc">${a.description}</div>
+          <div class="last">${a.last ? 'Last run ' + timeAgo(a.last.started_at) + ' · ' + a.last.status : 'No runs yet'} · <code>${a.model}</code></div>
+        </div>
+        <button data-key="${a.key}" ${a.running ? 'disabled' : ''}>${a.running ? 'Running…' : 'Trigger'}</button>
+      </div>`;
+    card.querySelector('button').addEventListener('click', () => trigger(a.key));
+    agentsEl.appendChild(card);
+  }
+  statusEl.textContent = 'ready';
+}
+
+async function refreshSessions() {
+  const r = await fetch('/api/sessions', { credentials: 'same-origin' });
+  if (!r.ok) return;
+  const { sessions } = await r.json();
+  if (!sessions.length) {
+    sessionsEl.innerHTML = '<div style="padding:14px 16px" class="empty">No sessions yet. Trigger an agent above.</div>';
+    return;
+  }
+  sessionsEl.innerHTML = '';
+  sessions.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'session-item';
+    if (i > 0) row.style.borderTop = '1px solid var(--border)';
+    const pillClass = s.status === 'running' ? 'running' : s.status === 'error' ? 'error' : 'done';
+    row.innerHTML = `
+      <div style="min-width:0; flex:1">
+        <div class="title">${s.title}</div>
+        <div class="meta">${timeAgo(s.started_at)} · ${s.event_count} events</div>
+      </div>
+      <span class="pill ${pillClass}">${s.status}</span>`;
+    row.addEventListener('click', () => openSession(s.id, s.status === 'running'));
+    sessionsEl.appendChild(row);
+  });
+}
+
+async function trigger(key) {
+  statusEl.textContent = `triggering ${key}…`;
+  const r = await fetch(`/api/agents/${key}/trigger`, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (r.status === 409) {
+    statusEl.textContent = `${key} already running`;
+    return;
+  }
+  if (!r.ok) {
+    statusEl.textContent = 'trigger failed: HTTP ' + r.status;
+    return;
+  }
+  statusEl.textContent = 'spawning session…';
+  // Poll for the new session to appear (orchestrator assigns the real ID on session.create)
+  for (let i = 0; i < 20; i++) {
+    await sleep(500);
+    const sr = await fetch('/api/sessions', { credentials: 'same-origin' });
+    const { sessions } = await sr.json();
+    const fresh = sessions.find(s => s.agent_key === key && s.status === 'running');
+    if (fresh && !fresh.id.startsWith('pending_')) {
+      openSession(fresh.id, true);
+      refreshAgents();
+      return;
+    }
+  }
+  statusEl.textContent = 'session did not start (check logs)';
+}
+
+function openSession(sid, isRunning) {
+  if (activeEvtSource) { activeEvtSource.close(); activeEvtSource = null; }
+  timelineEl.innerHTML = '';
+  activeSessionId = sid;
+  liveSection.style.display = 'block';
+  liveStatus.textContent = isRunning ? 'running' : 'replay';
+  liveStatus.className = 'pill ' + (isRunning ? 'running' : 'done');
+  statusEl.textContent = 'watching ' + sid.slice(0, 20);
+
+  const es = new EventSource(`/api/sessions/${sid}/events`, { withCredentials: true });
+  activeEvtSource = es;
+  es.onmessage = ev => {
+    try {
+      const data = JSON.parse(ev.data);
+      renderEvent(data);
+    } catch (e) { console.error(e, ev.data); }
+  };
+  es.addEventListener('close', () => { es.close(); });
+  es.onerror = () => {
+    // Heads up: FastAPI closes the stream when the session ends; browser reports an error.
+    // That's fine.
+  };
+}
+
+function renderEvent(e) {
+  const el = document.createElement('div');
+  const ts = e.ts ? new Date(e.ts).toLocaleTimeString() : '';
+  if (e.type === 'message') {
+    el.className = 'event message';
+    el.innerHTML = `<span class="ts">${ts}</span><div class="text">${escapeHtml(e.text)}</div>`;
+  } else if (e.type === 'thinking') {
+    el.className = 'event thinking';
+    el.innerHTML = `<span class="ts">${ts}</span><div class="text">💭 ${escapeHtml(e.text)}</div>`;
+  } else if (e.type === 'tool_call') {
+    el.className = 'event tool' + (e.is_error ? ' error' : '');
+    const icon = e.is_error ? '❌' : '🔧';
+    el.innerHTML = `
+      <details>
+        <summary><span class="ts">${ts}</span>${icon} <code>${e.name}</code> <span style="color:var(--muted)">· ${e.result_len} bytes${e.is_error ? ' · error' : ''}</span></summary>
+        <pre>args: ${escapeHtml(JSON.stringify(e.args, null, 2))}
+
+result: ${escapeHtml(e.result_preview)}</pre>
+      </details>`;
+  } else if (e.type === 'status') {
+    el.className = 'event status';
+    const kickoff = e.kickoff ? ` — "${escapeHtml(e.kickoff.slice(0, 80))}…"` : '';
+    const detail = e.detail ? ` — ${escapeHtml(e.detail)}` : '';
+    el.innerHTML = `<span class="ts">${ts}</span><b>${e.status}</b>${kickoff}${detail}`;
+    if (e.status === 'done' || e.status === 'error') {
+      liveStatus.textContent = e.status;
+      liveStatus.className = 'pill ' + (e.status === 'error' ? 'error' : 'done');
+      refreshAgents();
+      refreshSessions();
+    }
+  } else if (e.type === 'error') {
+    el.className = 'event error';
+    el.innerHTML = `<span class="ts">${ts}</span>${escapeHtml(e.text)}`;
+  } else if (e.type === 'note') {
+    el.className = 'event status';
+    el.innerHTML = `<span class="ts">${ts}</span>ℹ︎ ${escapeHtml(e.text)}`;
+  } else {
+    el.className = 'event';
+    el.innerHTML = `<span class="ts">${ts}</span>${escapeHtml(JSON.stringify(e))}`;
+  }
+  timelineEl.appendChild(el);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function timeAgo(iso) {
+  const d = new Date(iso); const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (s < 60) return `${Math.floor(s)}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return d.toLocaleString();
+}
+
+async function syncNow() {
+  const btn = document.getElementById('sync-now');
+  if (btn) { btn.disabled = true; btn.textContent = 'syncing…'; }
+  statusEl.textContent = 'syncing Canvas + Reminders and re-planning…';
+  try {
+    const r = await fetch('/api/solver/resolve', { method: 'POST', credentials: 'same-origin' });
+    const j = await r.json();
+    if (j.sync_summary) {
+      const ss = j.sync_summary;
+      statusEl.textContent = `synced: canvas +${ss.canvas_upserts||0} ✓${ss.canvas_mark_done||0}  rem ✓${ss.reminder_matches||0}  →  ${j.chunks||0} chunks (${j.at_risk||0} at risk)`;
+    } else if (j.error) {
+      statusEl.textContent = 'sync error: ' + j.error;
+    } else {
+      statusEl.textContent = 'synced';
+    }
+  } catch (e) {
+    statusEl.textContent = 'sync failed: ' + e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sync Canvas now'; }
+    refreshTasks();
+    refreshSolverRuns();
+  }
+}
+
+// Bootstrap
+(async () => {
+  document.getElementById('sync-now').addEventListener('click', syncNow);
+  document.getElementById('approve-all').addEventListener('click', approveAllPending);
+  await Promise.all([refreshTasks(), refreshPending(), refreshSolverRuns(), refreshAgents(), refreshSessions()]);
+  const r = await fetch('/api/sessions', { credentials: 'same-origin' });
+  const { sessions } = await r.json();
+  const running = sessions.find(s => s.status === 'running' && !s.id.startsWith('pending_'));
+  if (running) openSession(running.id, true);
+  setInterval(refreshTasks, 10000);
+  setInterval(refreshPending, 10000);
+  setInterval(refreshSolverRuns, 10000);
+  setInterval(refreshSessions, 8000);
+  setInterval(refreshAgents, 15000);
+})();
+</script>
+</body>
+</html>

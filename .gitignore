@@ -1,0 +1,42 @@
+# Secrets
+.env
+.env.local
+*.secret
+
+# Local state (dev flow writes these in the repo dir; docker compose
+# writes them under ./data/)
+state.db
+state.db-journal
+state.db-wal
+state.db-shm
+learning_state.json
+last_morning_date.txt
+data/
+
+# Runtime logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+venv/
+.venv/
+env/
+
+# Compiled Swift binary (rebuild from .swift source per-machine)
+macos/reminders_fetch
+
+# Third-party binaries downloaded at install time
+cloudflared
+cloudflared.tgz
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp

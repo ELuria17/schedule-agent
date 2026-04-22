@@ -1,0 +1,22 @@
+services:
+  orchestrator:
+    build: .
+    image: schedule-agent:local
+    container_name: schedule-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Tells paths.py to put .env / state.db / learning_state.json here
+      # instead of the image's read-only /app source tree.
+      SCHEDULE_AGENT_DATA_DIR: /data
+    ports:
+      - "8787:8787"
+    volumes:
+      # Single mount for all user-writable state. Data survives rebuilds
+      # and `docker compose down/up`.
+      - ./data:/data
+      # Optional: mount a container-specific schedule_config so you don't
+      # have to edit the repo file. Uncomment and provide the file.
+      # - ./schedule_config.docker.py:/app/schedule_config.py:ro
+    # Uvicorn inside the container binds 0.0.0.0:8787 by default (see
+    # orchestrator.py). The port above maps it to the host.
