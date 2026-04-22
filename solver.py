@@ -395,6 +395,14 @@ def resolve(
     slots = free_slots(start, end, external_events=events, now_utc=now)
     total_free = sum(s.duration_min for s in slots)
 
+    # Refresh duration estimates from history before planning. Cheap when
+    # task_history is stable; updates each source-originated task whose
+    # historical median has shifted ≥10% since the last estimate.
+    try:
+        tasks_mod.relearn_durations()
+    except Exception:
+        pass  # learning is best-effort; never block a plan cycle
+
     active = tasks_mod.list_active()
     chunks, at_risk = place(active, slots, now)
     scheduled_min = sum(c.duration_min for c in chunks)

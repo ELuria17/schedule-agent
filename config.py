@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     source_id TEXT,                                          -- external id (e.g. canvas assignment id)
     notes TEXT,
     completed_at TEXT,
+    duration_locked INTEGER NOT NULL DEFAULT 0,              -- 1 once user has edited duration_min
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -160,6 +161,15 @@ CREATE INDEX IF NOT EXISTS idx_session_events_session ON session_events (session
 _SCHEMA_VERSION = "1"
 
 
+def _ensure_columns(conn: sqlite3.Connection,
+                    adds: Iterable[tuple[str, str, str]]) -> None:
+    """Run `ALTER TABLE ADD COLUMN` for any column missing from the live DB."""
+    for table, col, col_def in adds:
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if col not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+
+
 def _connect(readonly: bool = False) -> sqlite3.Connection:
     conn = sqlite3.connect(
         str(DB_PATH), detect_types=sqlite3.PARSE_DECLTYPES,
@@ -176,6 +186,13 @@ def connect() -> sqlite3.Connection:
     first_boot = not DB_PATH.exists()
     conn = _connect()
     conn.executescript(SCHEMA)
+    # --- Forward-compatible column additions for existing installs. ---
+    # SQLite has no "ADD COLUMN IF NOT EXISTS"; we probe table_info and
+    # add any missing column explicitly. Keep this block terse: new entries
+    # are (table_name, column_name, column_def).
+    _ensure_columns(conn, [
+        ("tasks", "duration_locked", "INTEGER NOT NULL DEFAULT 0"),
+    ])
     # Seed once
     cur = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'")
     row = cur.fetchone()

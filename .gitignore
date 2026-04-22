@@ -2,6 +2,9 @@
 .env
 .env.local
 *.secret
+credentials.json
+google_token.json
+microsoft_token.json
 
 # Local state (dev flow writes these in the repo dir; docker compose
 # writes them under ./data/)

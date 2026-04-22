@@ -97,6 +97,41 @@
     border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 13px;
   }
 
+  /* Edit-task modal */
+  dialog.edit {
+    background: var(--card); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 0; max-width: 480px; width: calc(100% - 32px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  dialog.edit::backdrop {
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(3px);
+  }
+  dialog.edit form { padding: 20px 22px; }
+  dialog.edit h3 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+  dialog.edit .row { margin-bottom: 12px; }
+  dialog.edit label {
+    display: block; color: var(--muted);
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 5px;
+  }
+  dialog.edit input[type=text],
+  dialog.edit input[type=number],
+  dialog.edit input[type=datetime-local],
+  dialog.edit select,
+  dialog.edit textarea {
+    width: 100%; background: #0a0a0a; color: var(--fg);
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 8px 10px; font: inherit; font-size: 14px;
+  }
+  dialog.edit textarea { min-height: 60px; resize: vertical; }
+  dialog.edit .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  dialog.edit .actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+    margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+  }
+
   /* Solver activity strip */
   .solver-runs { font-size: 12px; color: var(--muted); padding: 10px 14px }
   .solver-runs .run { display: flex; gap: 10px; padding: 2px 0 }
@@ -119,6 +154,50 @@
   </h2>
   <div id="pending" class="card" style="padding:0"></div>
 </section>
+
+<dialog id="edit-modal" class="edit">
+  <form method="dialog" id="edit-form">
+    <h3>Edit task</h3>
+    <input type="hidden" name="id">
+    <div class="row">
+      <label>Title</label>
+      <input type="text" name="title" required>
+    </div>
+    <div class="two-col">
+      <div class="row">
+        <label>Duration (min)</label>
+        <input type="number" name="duration_min" min="5" step="5" required>
+      </div>
+      <div class="row">
+        <label>Priority</label>
+        <select name="priority">
+          <option value="asap">asap</option>
+          <option value="high">high</option>
+          <option value="medium">medium</option>
+          <option value="low">low</option>
+        </select>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="row">
+        <label>Deadline</label>
+        <input type="datetime-local" name="deadline_local">
+      </div>
+      <div class="row">
+        <label>Category / course</label>
+        <input type="text" name="course" placeholder="optional">
+      </div>
+    </div>
+    <div class="row">
+      <label>Notes</label>
+      <textarea name="notes" placeholder="optional"></textarea>
+    </div>
+    <div class="actions">
+      <button type="button" class="ghost" id="edit-cancel">Cancel</button>
+      <button type="submit" id="edit-save">Save</button>
+    </div>
+  </form>
+</dialog>
 
 <section id="tasks-section">
   <h2>Tasks
@@ -258,8 +337,10 @@ async function refreshPending() {
           <span style="opacity:0.6">src: ${escapeHtml(t.source)}</span>
         </div>
       </div>
+      <button class="ghost edit" data-id="${t.id}" title="Edit">✎</button>
       <button class="approve" data-id="${t.id}" title="Approve">✓</button>
       <button class="ghost reject" data-id="${t.id}" title="Reject">×</button>`;
+    row.querySelector('.edit').addEventListener('click', () => openEditModal(t));
     row.querySelector('.approve').addEventListener('click', () => approveTask(t.id));
     row.querySelector('.reject').addEventListener('click', () => rejectTask(t.id));
     pendingEl.appendChild(row);
@@ -276,6 +357,66 @@ async function rejectTask(id) {
   await fetch(`/api/tasks/${id}/reject`, { method: 'POST', credentials: 'same-origin' });
   refreshPending();
 }
+
+// ---- Edit-task modal ----
+
+const editDialog = document.getElementById('edit-modal');
+const editForm = document.getElementById('edit-form');
+
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalInput(val) {
+  if (!val) return null;
+  // `new Date(val)` interprets a 'YYYY-MM-DDTHH:mm' string in local time,
+  // which is exactly what we want. Serialize to UTC ISO.
+  const d = new Date(val);
+  return isNaN(d) ? null : d.toISOString();
+}
+
+function openEditModal(task) {
+  editForm.id.value = task.id;
+  editForm.title.value = task.title || '';
+  editForm.duration_min.value = task.duration_min || 30;
+  editForm.priority.value = task.priority || 'medium';
+  editForm.deadline_local.value = toLocalInput(task.deadline_ts);
+  editForm.course.value = task.course || '';
+  editForm.notes.value = task.notes || '';
+  editDialog.showModal();
+}
+
+document.getElementById('edit-cancel').addEventListener('click', () => editDialog.close());
+
+editForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const id = editForm.id.value;
+  const body = {
+    title: editForm.title.value.trim(),
+    duration_min: parseInt(editForm.duration_min.value, 10),
+    priority: editForm.priority.value,
+    course: editForm.course.value.trim() || null,
+    notes: editForm.notes.value,
+    deadline_ts: fromLocalInput(editForm.deadline_local.value),
+  };
+  const r = await fetch(`/api/tasks/${id}`, {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    alert('Could not save: ' + r.status);
+    return;
+  }
+  editDialog.close();
+  refreshPending();
+  refreshTasks();
+});
 
 async function approveAllPending() {
   const r = await fetch('/api/tasks/pending', { credentials: 'same-origin' });

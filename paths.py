@@ -78,6 +78,18 @@ def morning_marker_path() -> Path:
     return data_dir() / "last_morning_date.txt"
 
 
+def google_token_path() -> Path:
+    """Cached Google OAuth refresh token. Created by the first successful
+    run of `python setup.py` (which runs the loopback consent flow)."""
+    return data_dir() / "google_token.json"
+
+
+def microsoft_token_path() -> Path:
+    """Cached Microsoft (MSAL) token serialization. Written by
+    microsoft_graph_auth.authorize_interactive() after the user signs in."""
+    return data_dir() / "microsoft_token.json"
+
+
 def reminders_fetch_source_path() -> Path:
     """Path to the Swift source shipped with the repo / bundle. Always
     read-only: next to __file__, i.e. inside the PyInstaller bundle when

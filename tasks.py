@@ -222,7 +222,12 @@ def mark_complete(task_id: int, *, actual_min: Optional[int] = None) -> Optional
 
 
 def update(task_id: int, **fields) -> Optional[dict]:
-    """Partial update. Only allowlisted columns."""
+    """Partial update. Only allowlisted columns.
+
+    A write to `duration_min` flips `duration_locked=1`, which pins the
+    value and prevents `relearn_durations()` from overriding it. This is
+    the "the user knows how long this really takes" signal.
+    """
     allowed = {
         "title", "course", "duration_min", "deadline_ts", "priority",
         "status", "min_chunk_min", "max_chunk_min", "preferred_window",
@@ -231,11 +236,52 @@ def update(task_id: int, **fields) -> Optional[dict]:
     data = {k: v for k, v in fields.items() if k in allowed}
     if not data:
         return get(task_id)
+    # If the user is editing duration explicitly, pin it.
+    if "duration_min" in data:
+        data["duration_locked"] = 1
     data["updated_at"] = _now_utc_iso()
     cols = ", ".join(f"{k}=?" for k in data)
     with connect() as conn:
         conn.execute(f"UPDATE tasks SET {cols} WHERE id=?", (*data.values(), task_id))
     return get(task_id)
+
+
+def relearn_durations(*, min_change_pct: float = 0.10) -> int:
+    """Refresh duration estimates for source-originated tasks from history.
+
+    Walks every active task whose `duration_locked=0` and `source != 'manual'`,
+    re-runs `suggest_duration()` against the current `task_history`, and
+    writes back any estimate that differs by at least `min_change_pct`.
+
+    Called at the top of each solver cycle so the plan reflects what the
+    user actually takes on similar work, not just the original provider
+    hint. Returns the number of rows updated (useful for logging).
+    """
+    updated = 0
+    with connect() as conn:
+        rows = conn.execute(
+            """SELECT id, title, course, duration_min, source
+               FROM tasks
+               WHERE status IN ('scheduled','in_progress')
+                 AND duration_locked = 0
+                 AND source != 'manual'"""
+        ).fetchall()
+    for r in rows:
+        s = suggest_duration(r["title"], r["course"])
+        if s is None:
+            continue
+        current = int(r["duration_min"])
+        if current <= 0:
+            continue
+        if abs(s - current) / current < min_change_pct:
+            continue
+        with connect() as conn:
+            conn.execute(
+                "UPDATE tasks SET duration_min=?, updated_at=? WHERE id=?",
+                (s, _now_utc_iso(), r["id"]),
+            )
+        updated += 1
+    return updated
 
 
 def delete(task_id: int) -> bool:

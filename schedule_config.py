@@ -33,8 +33,14 @@ from providers.notifier import Notifier
 # Import only the ones you plan to use. Unused imports are harmless but noisy.
 
 from providers.icloud_caldav import ICloudCalDAVProvider, GenericCalDAVProvider
+from providers.google_calendar import GoogleCalendarProvider
+from providers.outlook_calendar import OutlookCalendarProvider
 from providers.canvas_task_source import CanvasTaskSource
 from providers.todoist_task_source import TodoistTaskSource
+from providers.gmail_scanner import GmailScanner
+from providers.google_tasks import GoogleTasksProvider
+from providers.outlook_mail_scanner import OutlookMailScanner
+from providers.microsoft_todo import MicrosoftTodoProvider
 from providers.apple_reminders import AppleRemindersTodoSource
 from providers.imessage_notifier import IMessageNotifier
 from providers.ntfy_notifier import NtfyNotifier
@@ -112,7 +118,23 @@ TODO_LIST_TO_COURSE: dict[str, str] = {
 # Google Calendar and Microsoft Outlook need OAuth2 and are next on the
 # roadmap — see docs/providers.md.
 
-if os.environ.get("CALDAV_URL"):
+if os.environ.get("GOOGLE_CALENDAR_CREDENTIALS"):
+    from paths import google_token_path
+    CALENDAR: CalendarProvider = GoogleCalendarProvider(
+        credentials_path=os.environ["GOOGLE_CALENDAR_CREDENTIALS"],
+        token_path=str(google_token_path()),
+        write_calendar_name=os.environ.get("WRITE_CALENDAR_NAME", "Study Blocks"),
+        # read_calendar_allowlist=["Personal", "School", "Family"],
+    )
+elif (os.environ.get("MICROSOFT_CLIENT_ID")
+      and os.environ.get("ENABLE_OUTLOOK_CALENDAR", "false").lower() in ("1", "true", "yes")):
+    CALENDAR: CalendarProvider = OutlookCalendarProvider(
+        client_id=os.environ["MICROSOFT_CLIENT_ID"],
+        tenant=os.environ.get("MICROSOFT_TENANT", "common"),
+        write_calendar_name=os.environ.get("WRITE_CALENDAR_NAME", "Study Blocks"),
+        # read_calendar_allowlist=["Work", "Personal"],
+    )
+elif os.environ.get("CALDAV_URL"):
     CALENDAR: CalendarProvider = GenericCalDAVProvider(
         url=os.environ["CALDAV_URL"],
         username=os.environ["CALDAV_USER"],
@@ -139,18 +161,25 @@ else:
 
 TASK_SOURCES: list[TaskSource] = []
 
-# --- Canvas LMS --- (students). Uncomment if you track work in Canvas.
+# Default approval policy for every source. False = new tasks flow
+# straight into scheduling. True = new tasks land in the hub's
+# pending-review queue and the user has to approve them first.
+# Per-source overrides are allowed below.
+_DEFAULT_REQUIRE_APPROVAL = (
+    os.environ.get("DEFAULT_REQUIRE_APPROVAL", "false").lower()
+    in ("1", "true", "yes")
+)
+
+# --- Canvas LMS --- (students).
 if os.environ.get("CANVAS_TOKEN"):
     TASK_SOURCES.append(CanvasTaskSource(
         base_url=os.environ.get("CANVAS_BASE_URL",
                                 "https://psu.instructure.com/api/v1"),
         token=os.environ["CANVAS_TOKEN"],
-        # Set to True if you want every new Canvas assignment to land in the
-        # pending-review queue before it's eligible for scheduling.
-        require_approval=False,
+        require_approval=_DEFAULT_REQUIRE_APPROVAL,
     ))
 
-# --- Todoist --- (professionals; works on any platform).
+# --- Todoist --- (any platform).
 # Generate a token at Settings → Integrations → Developer in the Todoist
 # web app, then set TODOIST_TOKEN in .env.
 if os.environ.get("TODOIST_TOKEN"):
@@ -162,7 +191,55 @@ if os.environ.get("TODOIST_TOKEN"):
         # Optional: only pull tasks tagged with one of these labels.
         # label_filter=["focus"],
         default_duration_min=45,
-        require_approval=False,
+        require_approval=_DEFAULT_REQUIRE_APPROVAL,
+    ))
+
+
+# --- Gmail inbox scanner --- (rides on Google OAuth).
+# Claude reads unread/labeled emails and extracts actionable tasks.
+# Costs Anthropic tokens per scan, so it's opt-in.
+if (os.environ.get("GOOGLE_CALENDAR_CREDENTIALS")
+        and os.environ.get("ENABLE_GMAIL_SCAN", "false").lower() in ("1", "true", "yes")):
+    from paths import google_token_path as _gtp
+    _gmail_labels = os.environ.get("GMAIL_LABEL_FILTER", "")
+    TASK_SOURCES.append(GmailScanner(
+        credentials_path=os.environ["GOOGLE_CALENDAR_CREDENTIALS"],
+        token_path=str(_gtp()),
+        label_filter=[l.strip() for l in _gmail_labels.split(",") if l.strip()] or None,
+        max_messages=int(os.environ.get("GMAIL_MAX_MESSAGES", "25")),
+        require_approval=_DEFAULT_REQUIRE_APPROVAL,
+    ))
+
+# --- Google Tasks --- (rides on Google OAuth). Free, no LLM calls.
+if (os.environ.get("GOOGLE_CALENDAR_CREDENTIALS")
+        and os.environ.get("ENABLE_GOOGLE_TASKS", "false").lower() in ("1", "true", "yes")):
+    from paths import google_token_path as _gtp
+    TASK_SOURCES.append(GoogleTasksProvider(
+        credentials_path=os.environ["GOOGLE_CALENDAR_CREDENTIALS"],
+        token_path=str(_gtp()),
+        require_approval=_DEFAULT_REQUIRE_APPROVAL,
+    ))
+
+# --- Outlook Mail inbox scanner --- (rides on Microsoft Graph OAuth).
+if (os.environ.get("MICROSOFT_CLIENT_ID")
+        and os.environ.get("ENABLE_OUTLOOK_MAIL_SCAN", "false").lower() in ("1", "true", "yes")):
+    _outlook_cats = os.environ.get("OUTLOOK_CATEGORY_FILTER", "")
+    TASK_SOURCES.append(OutlookMailScanner(
+        client_id=os.environ["MICROSOFT_CLIENT_ID"],
+        tenant=os.environ.get("MICROSOFT_TENANT", "common"),
+        folder=os.environ.get("OUTLOOK_MAIL_FOLDER", "inbox"),
+        category_filter=[c.strip() for c in _outlook_cats.split(",") if c.strip()] or None,
+        max_messages=int(os.environ.get("OUTLOOK_MAX_MESSAGES", "25")),
+        require_approval=_DEFAULT_REQUIRE_APPROVAL,
+    ))
+
+# --- Microsoft To Do --- (rides on Microsoft Graph OAuth).
+if (os.environ.get("MICROSOFT_CLIENT_ID")
+        and os.environ.get("ENABLE_MICROSOFT_TODO", "false").lower() in ("1", "true", "yes")):
+    TASK_SOURCES.append(MicrosoftTodoProvider(
+        client_id=os.environ["MICROSOFT_CLIENT_ID"],
+        tenant=os.environ.get("MICROSOFT_TENANT", "common"),
+        require_approval=_DEFAULT_REQUIRE_APPROVAL,
     ))
 
 

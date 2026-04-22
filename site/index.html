@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AutoPlan — AI schedules. You focus.</title>
-<meta name="description" content="AutoPlan reads your tasks and assignments, figures out when you'll actually have time to do them, and blocks your calendar around your classes and meetings. Runs on your Mac. Everything stays with you.">
+<meta name="description" content="AutoPlan reads your to-do list and your email, figures out when you'll actually have time to do each thing, and blocks the time on your calendar. Runs on your own machine. Your data stays with you.">
 <link rel="icon" type="image/png" href="assets/autoplan-logo.png">
 <meta property="og:title" content="AutoPlan — AI schedules. You focus.">
-<meta property="og:description" content="Stop staring at a to-do list wondering when you'll get to things. AutoPlan blocks real time on your calendar around your classes and meetings.">
+<meta property="og:description" content="Stop staring at a to-do list wondering when you'll get to things. AutoPlan blocks real time on your calendar around your meetings, obligations, and sleep.">
 <meta property="og:image" content="assets/autoplan-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -541,11 +541,11 @@
         waiting. It doesn't tell you when you'll actually do them.
       </p>
       <p class="body">
-        AutoPlan is different. It looks at your classes, your meetings, and
-        your sleep — the times that are already taken — and then fits your
-        homework, your reading, and your errands into the spaces in between.
-        If something won't fit before its deadline, it tells you, before
-        the deadline sneaks up.
+        AutoPlan is different. It looks at the time you've already committed
+        — meetings, appointments, the block you keep for the gym, when you
+        sleep — and then fits everything else into the real gaps. If something
+        won't fit before its deadline, it tells you, before the deadline
+        sneaks up.
       </p>
     </div>
     <div class="shot reveal">
@@ -569,7 +569,7 @@
         <rect x="34" y="150" width="1050" height="88" rx="12" class="mk-surf"/>
         <rect x="34" y="150" width="4" height="88" class="mk-accent"/>
         <text x="60" y="180" font-size="12" class="t-mono t-mute">PENDING REVIEW · 2 WAITING</text>
-        <text x="60" y="208" font-size="15">ENGL 202 — draft outline   ·   PSYCH 100 — Ch. 6 reading</text>
+        <text x="60" y="208" font-size="15">Draft the brand brief   ·   Review Q3 headcount plan</text>
         <rect x="950" y="170" width="110" height="40" rx="8" class="mk-ink-1"/>
         <text x="1005" y="195" text-anchor="middle" font-size="13" class="mk-bg">Approve all</text>
 
@@ -590,8 +590,8 @@
         <rect x="58" y="398" width="1002" height="64" rx="10" class="mk-bg"/>
         <rect x="78" y="418" width="56" height="22" rx="11" class="mk-accent"/>
         <text x="106" y="434" text-anchor="middle" font-size="11" class="mk-accent-on t-mono" font-weight="600">ASAP</text>
-        <text x="150" y="434" font-size="15">ECON 104 — Problem Set 8</text>
-        <text x="150" y="452" font-size="12" class="t-dim">90 min · due Fri 11:59 PM · 2 chunks placed</text>
+        <text x="150" y="434" font-size="15">Finalize Acme proposal</text>
+        <text x="150" y="452" font-size="12" class="t-dim">90 min · due Fri 5 PM · 2 chunks placed</text>
         <circle cx="1020" cy="430" r="16" class="mk-bg-2"/>
         <path d="M1013 431 l5 5 l10 -10" stroke-width="2" fill="none" stroke="currentColor" class="mk-ink-2" style="color: var(--ink-2);"/>
 
@@ -601,7 +601,7 @@
         <text x="106" y="514" text-anchor="middle" font-size="11" class="mk-accent-on t-mono" font-weight="600">HIGH</text>
         <rect x="144" y="498" width="72" height="22" rx="11" class="mk-accent"/>
         <text x="180" y="514" text-anchor="middle" font-size="11" class="mk-accent-on t-mono" font-weight="600">AT RISK</text>
-        <text x="232" y="514" font-size="15">MGMT 301 — group paper draft</text>
+        <text x="232" y="514" font-size="15">Board deck — Q3 strategy</text>
         <text x="232" y="532" font-size="12" class="t-dim">needs 180 min · only 90 min free before Thu 5 PM</text>
 
         <!-- Task 3 -->
@@ -636,7 +636,7 @@
         <rect x="1138" y="446" width="406" height="1" class="mk-soft" fill="var(--border-soft)"/>
 
         <text x="1138" y="480" font-size="12" class="t-mono t-dim">8:47 AM · poll</text>
-        <text x="1138" y="500" font-size="14">canvas +1 new assignment</text>
+        <text x="1138" y="500" font-size="14">todoist +1 new task</text>
         <rect x="1138" y="516" width="406" height="1" class="mk-soft" fill="var(--border-soft)"/>
 
         <text x="1138" y="550" font-size="12" class="t-mono t-dim">8:32 AM · task_mutation</text>
@@ -644,7 +644,7 @@
         <rect x="1138" y="586" width="406" height="1" class="mk-soft" fill="var(--border-soft)"/>
 
         <text x="1138" y="620" font-size="12" class="t-mono t-dim">Yesterday 11:14 PM</text>
-        <text x="1138" y="640" font-size="14">canvas ✓3 marked done</text>
+        <text x="1138" y="640" font-size="14">reminders ✓3 marked done</text>
 
         <text x="1138" y="775" font-size="12" class="t-dim">View all activity →</text>
       </svg>
@@ -666,10 +666,16 @@
           <div class="num">Step 1</div>
           <h3>Tell AutoPlan about your life.</h3>
           <p>
-            Connect your calendar (Apple Calendar today, Google Calendar
-            and Outlook next) and, if you're a student, your
-            <strong>Canvas</strong> or (soon) <strong>Google Classroom</strong>
-            account. Setup takes about three minutes.
+            Open the setup window and pick the pieces you use. A calendar
+            — Apple, Google, Outlook, or any CalDAV server. Optional task
+            sources — Canvas, Todoist, Gmail scanning, Google Tasks,
+            Outlook Mail scanning, or Microsoft To Do. A way to hear from
+            AutoPlan — iMessage, Pushover, Slack, email, or ntfy. And one
+            choice: should new tasks go straight to your calendar, or
+            land in the hub for you to approve first? Google and Microsoft
+            each get a built-in wizard that walks you through their
+            respective sign-in flows click-by-click. No docs, no Terminal,
+            no copy-pasted commands — everything happens inside the app.
           </p>
         </div>
         <div class="step-img">
@@ -731,11 +737,14 @@
           <div class="num">Step 2</div>
           <h3>Your to-dos show up on their own.</h3>
           <p>
-            AutoPlan pulls tasks in from your <strong>Canvas</strong>
-            account (students) and your <strong>Todoist</strong> inbox
-            (professionals). Google Classroom, Google Tasks, and
-            Microsoft To Do are next. You can also just type a task in
-            the hub: <em>"Read chapter 4, about 40 minutes, due Friday."</em>
+            AutoPlan pulls tasks from wherever they live. Todoist and
+            Microsoft To Do for personal lists. Canvas for assignments.
+            Google Tasks for quick captures. Your <strong>inbox</strong>:
+            AutoPlan periodically scans unread Gmail and Outlook mail
+            with Claude, extracts the actionable asks ("Can you send the
+            contract by Thursday?"), and files them. You can also just
+            type a task in the hub or tell the AI in plain English —
+            <em>"Finish the Acme proposal, about 90 minutes, due Friday"</em>.
           </p>
         </div>
         <div class="step-img">
@@ -762,8 +771,8 @@
             <rect x="40" y="180" width="1120" height="82" rx="12" class="mk-bg"/>
             <rect x="64" y="206" width="62" height="26" rx="13" class="mk-accent"/>
             <text x="95" y="224" text-anchor="middle" font-size="12" class="mk-accent-on t-mono" font-weight="600">ASAP</text>
-            <text x="142" y="224" font-size="17" font-weight="500">Finish ECON problem set 8</text>
-            <text x="142" y="245" font-size="13" class="t-mute">ECON 104 · 90 min · due tomorrow 11:59 PM</text>
+            <text x="142" y="224" font-size="17" font-weight="500">Finish Acme proposal draft</text>
+            <text x="142" y="245" font-size="13" class="t-mute">Client work · 90 min · due tomorrow 5 PM</text>
             <circle cx="1100" cy="221" r="18" class="mk-bg-2"/>
             <path d="M1091 221 l6 7 l12 -13" stroke-width="2" fill="none" stroke="currentColor" style="color: var(--ink-2)"/>
 
@@ -771,22 +780,22 @@
             <rect x="40" y="282" width="1120" height="82" rx="12" class="mk-bg"/>
             <rect x="64" y="308" width="62" height="26" rx="13" class="mk-accent"/>
             <text x="95" y="326" text-anchor="middle" font-size="12" class="mk-accent-on t-mono" font-weight="600">HIGH</text>
-            <text x="142" y="326" font-size="17" font-weight="500">Draft MGMT group paper intro</text>
-            <text x="142" y="347" font-size="13" class="t-mute">MGMT 301 · 120 min · due Thu 5 PM</text>
+            <text x="142" y="326" font-size="17" font-weight="500">Review Q2 numbers before Thursday sync</text>
+            <text x="142" y="347" font-size="13" class="t-mute">Ops review · 120 min · due Thu 5 PM</text>
 
             <!-- task 3 -->
             <rect x="40" y="384" width="1120" height="82" rx="12" class="mk-bg"/>
             <rect x="64" y="410" width="74" height="26" rx="13" class="mk-surf"/>
             <text x="101" y="428" text-anchor="middle" font-size="12" class="t-mono t-mute" font-weight="600">MEDIUM</text>
-            <text x="154" y="428" font-size="17" font-weight="500">Read PSYCH 100, Chapter 6</text>
-            <text x="154" y="449" font-size="13" class="t-mute">PSYCH 100 · 40 min · due Fri</text>
+            <text x="154" y="428" font-size="17" font-weight="500">Prep onboarding deck for new hire</text>
+            <text x="154" y="449" font-size="13" class="t-mute">People ops · 40 min · due Fri</text>
 
             <!-- task 4 -->
             <rect x="40" y="486" width="1120" height="82" rx="12" class="mk-bg"/>
             <rect x="64" y="512" width="74" height="26" rx="13" class="mk-surf"/>
             <text x="101" y="530" text-anchor="middle" font-size="12" class="t-mono t-mute" font-weight="600">MEDIUM</text>
-            <text x="154" y="530" font-size="17" font-weight="500">IST lab writeup</text>
-            <text x="154" y="551" font-size="13" class="t-mute">IST 130 · 60 min · due Mon</text>
+            <text x="154" y="530" font-size="17" font-weight="500">Write the status update for finance</text>
+            <text x="154" y="551" font-size="13" class="t-mute">Reporting · 60 min · due Mon</text>
 
             <!-- task 5 -->
             <rect x="40" y="588" width="1120" height="82" rx="12" class="mk-bg"/>
@@ -1019,32 +1028,32 @@
 
     <div class="audiences">
       <div class="audience reveal">
-        <h4>Students</h4>
+        <h4>Your meetings are scheduled. The actual work isn't.</h4>
         <p>
-          Classes are fixed. Assignments aren't. AutoPlan pulls your
-          <strong>Canvas</strong> work in automatically (and
-          <strong>Google Classroom</strong> support is next), spreads it
-          across the evenings you actually have free, and warns you before
-          a paper eats your weekend.
+          Emails pile up, someone asks for "a quick thing," your calendar
+          looks fine until Thursday at 3 and you realize there's nowhere
+          the work actually lives. AutoPlan holds the time, so what you
+          said you'd do shows up on your calendar like any other
+          commitment.
         </p>
       </div>
       <div class="audience reveal">
-        <h4>Busy professionals</h4>
+        <h4>Your to-do list keeps growing. Your days don't.</h4>
         <p>
-          Meetings are scheduled; the actual work isn't. AutoPlan holds
-          real time on your calendar for the things that matter, and
-          pulls tasks straight from your <strong>Todoist</strong> (live
-          today) so you're not re-typing what someone already asked you
-          to do. Google Tasks, Microsoft To Do, and email scanning are
-          on the way.
+          Reviews, write-ups, drafts, reading, prep, follow-ups — every
+          task has an invisible duration that never quite fits in the
+          gaps between meetings. AutoPlan estimates how long each thing
+          will really take, fits it into the calendar around everything
+          else, and learns as it goes.
         </p>
       </div>
       <div class="audience reveal">
-        <h4>Anyone with a long list</h4>
+        <h4>Deadlines sneak up on you.</h4>
         <p>
-          If a task isn't on your calendar, it doesn't get done. AutoPlan
-          does the calendar part for you, so the list stops feeling
-          impossible.
+          The 4pm-on-Friday deliverable that looked fine on Monday now
+          needs three hours you don't have. AutoPlan notices the day you
+          first accept the work — if something won't fit before its
+          deadline, it tells you immediately, not the night before.
         </p>
       </div>
     </div>
@@ -1072,17 +1081,18 @@
       <div class="int-row reveal">
         <div class="int-head">
           <h4>Where your tasks come from</h4>
-          <p>LMS, to-do app, or your own typing — whatever's easiest.</p>
+          <p>Your to-do app, your project tracker, your email, your class portal — or just your typing. Whatever's easiest.</p>
         </div>
         <div class="int-tags">
-          <span class="int-tag" data-state="live">Canvas LMS</span>
+          <span class="int-tag" data-state="live">Gmail inbox scanning</span>
+          <span class="int-tag" data-state="live">Outlook Mail scanning</span>
+          <span class="int-tag" data-state="live">Google Tasks</span>
+          <span class="int-tag" data-state="live">Microsoft To Do</span>
           <span class="int-tag" data-state="live">Todoist</span>
+          <span class="int-tag" data-state="live">Canvas LMS</span>
           <span class="int-tag" data-state="live">Type directly in the hub</span>
           <span class="int-tag" data-state="live">Tell the AI in plain English</span>
           <span class="int-tag" data-state="byo">Google Classroom</span>
-          <span class="int-tag" data-state="byo">Google Tasks</span>
-          <span class="int-tag" data-state="byo">Microsoft To Do</span>
-          <span class="int-tag" data-state="soon">Gmail / Outlook email scanning</span>
         </div>
       </div>
 
@@ -1097,8 +1107,8 @@
           <span class="int-tag" data-state="live">Posteo</span>
           <span class="int-tag" data-state="live">Nextcloud / Radicale</span>
           <span class="int-tag" data-state="live">Any CalDAV server</span>
-          <span class="int-tag" data-state="byo">Google Calendar</span>
-          <span class="int-tag" data-state="byo">Microsoft Outlook</span>
+          <span class="int-tag" data-state="live">Google Calendar</span>
+          <span class="int-tag" data-state="live">Outlook / Microsoft 365</span>
         </div>
       </div>
 
@@ -1123,8 +1133,8 @@
         </div>
         <div class="int-tags">
           <span class="int-tag" data-state="live">Apple Reminders (macOS)</span>
-          <span class="int-tag" data-state="byo">Google Tasks</span>
-          <span class="int-tag" data-state="byo">Microsoft To Do</span>
+          <span class="int-tag" data-state="live">Google Tasks</span>
+          <span class="int-tag" data-state="live">Microsoft To Do</span>
           <span class="int-tag" data-state="soon">Todoist completions sync</span>
         </div>
       </div>
@@ -1136,27 +1146,84 @@
   <div class="wrap-narrow">
     <div class="reveal">
       <span class="eyebrow">Before you start</span>
-      <h2>Three things you'll need.</h2>
+      <h2>What you'll need.</h2>
+      <p class="body" style="margin-top: 10px;">
+        Four things are required. Everything else — email scanning,
+        task sources, choice of notifier — is optional and toggleable
+        anytime.
+      </p>
     </div>
 
     <div class="reqs">
       <div class="req reveal">
         <h5>A computer</h5>
-        <p>Mac is a double-click app. Windows and Linux work today if you're comfortable with a 15-minute Terminal setup — walkthrough linked below.</p>
-      </div>
-      <div class="req reveal">
-        <h5>A calendar AutoPlan can write to</h5>
-        <p>Apple Calendar (built into every Mac, syncs with iCloud) is the supported option today. Google Calendar and Outlook are next — in the meantime, events synced <em>into</em> Apple Calendar from either work fine.</p>
-      </div>
-      <div class="req reveal">
-        <h5>About $5 a month</h5>
         <p>
-          AutoPlan uses Claude (from Anthropic) for the friendly message
-          part. Sign up free, add a few dollars of credit — typical usage
-          runs under $5/month. You can also run AutoPlan without the AI
-          layer entirely, for free.
+          Mac is a double-click app. Windows and Linux work today via a
+          15-minute Terminal install — full walkthrough linked below.
+          AutoPlan runs entirely on your machine; nothing is hosted by us.
         </p>
       </div>
+      <div class="req reveal">
+        <h5>An Anthropic API key</h5>
+        <p>
+          AutoPlan uses Claude for the friendly message layer and the
+          email scanner. Sign up free at
+          <code>console.anthropic.com</code> and add a few dollars of
+          credit — typical usage runs well under $5/month. You can also
+          run AutoPlan without the AI and use it as a pure scheduler.
+        </p>
+      </div>
+      <div class="req reveal">
+        <h5>A calendar to write to</h5>
+        <p>
+          One of: Apple Calendar / iCloud, Google Calendar, Outlook /
+          Microsoft 365, Fastmail, Posteo, Mailbox.org, Nextcloud,
+          Radicale, or any other CalDAV server. The setup wizard has
+          guided sign-in flows for Google and Microsoft; the rest take
+          a username and password.
+        </p>
+      </div>
+      <div class="req reveal">
+        <h5>A way to be notified</h5>
+        <p>
+          Pick one: iMessage (macOS only), Pushover (best mobile push,
+          $5 one-time), Slack DM or channel, email via any SMTP provider
+          (Gmail, Outlook, Fastmail, SES, Mailgun, anything), or ntfy.sh
+          push (free, cross-platform, no account needed). AutoPlan uses
+          this for your morning summary and at-risk alerts.
+        </p>
+      </div>
+    </div>
+
+    <div class="reveal" style="margin-top: 40px;">
+      <span class="eyebrow">Optional</span>
+      <h3 style="font-size: 20px; margin-top: 6px; margin-bottom: 10px;">Where your tasks come from</h3>
+      <p class="body">
+        AutoPlan works fine with <em>no</em> connected task source — type
+        tasks into the hub or just talk to the AI. But if you already
+        track work somewhere, connect it and tasks sync automatically:
+      </p>
+      <ul style="margin-top: 12px; padding-left: 22px; line-height: 1.8; color: var(--ink-2);">
+        <li><strong>Canvas LMS</strong> — students, pulls your assignments</li>
+        <li><strong>Todoist</strong> — personal to-do app; works everywhere</li>
+        <li><strong>Google Tasks</strong> — free Google todo list; rides on the Google Calendar connection</li>
+        <li><strong>Microsoft To Do</strong> — Microsoft's free todo app; rides on the Outlook connection</li>
+        <li><strong>Gmail inbox scanning</strong> — Claude reads unread emails and extracts tasks from them</li>
+        <li><strong>Outlook Mail inbox scanning</strong> — same thing for Outlook / Microsoft 365 mail</li>
+        <li><strong>Apple Reminders</strong> (macOS, auto-close only) — when you check a task off in Reminders, AutoPlan closes the matching one</li>
+      </ul>
+    </div>
+
+    <div class="reveal" style="margin-top: 32px;">
+      <span class="eyebrow">Optional</span>
+      <h3 style="font-size: 20px; margin-top: 6px; margin-bottom: 10px;">Two flows — pick what fits your job</h3>
+      <p class="body">
+        New tasks can either go straight onto your calendar
+        (<strong>Auto</strong>) or land in the hub's pending-review queue
+        for you to approve, edit, or remove before they get scheduled
+        (<strong>Review first</strong>). Pick one in setup — you can
+        switch anytime.
+      </p>
     </div>
   </div>
 </section>
@@ -1228,11 +1295,16 @@
       <details class="reveal">
         <summary>Is my data safe? <span class="plus" aria-hidden="true"></span></summary>
         <p>
-          Yes. AutoPlan runs entirely on your Mac. Your tasks, your
-          calendar, and your credentials never leave your computer. The
-          only thing that talks to the internet is the AI that writes your
-          daily summary — and it only sees the summary it's being asked
-          to write.
+          Yes. AutoPlan runs entirely on your own computer — there is
+          no cloud backend, no shared database, no account to create
+          with us. Your tasks, calendar events, email bodies, and
+          provider credentials all live in a local SQLite file and
+          a local <code>.env</code> file. The only things that leave
+          your machine are calls to the services <em>you</em> asked it
+          to talk to: Anthropic (for the AI summary and optional email
+          extraction), your calendar provider's API, your task sources'
+          APIs, and your notifier. Turn any of them off and that traffic
+          stops.
         </p>
       </details>
 
@@ -1248,25 +1320,141 @@
       <details class="reveal">
         <summary>What about Google Calendar or Outlook? <span class="plus" aria-hidden="true"></span></summary>
         <p>
-          Apple Calendar / iCloud is the only one wired up today. Native
-          <strong>Google Calendar</strong> and <strong>Microsoft Outlook</strong>
-          are next on the roadmap — both will write the same AutoPlan
-          study blocks to their own calendars via their official APIs.
-          In the meantime, if you already sync Google or Outlook events
-          <em>into</em> your Apple Calendar, AutoPlan sees them there and
-          respects them, so it's often a softer switch than it sounds.
+          Both are supported today. The setup window has a built-in
+          wizard for each — you pick "Google Calendar" or "Outlook /
+          Microsoft 365," follow the numbered steps (every click is
+          shown), and sign in. Each takes about 10 minutes the first
+          time and you never touch it again. The same Google connection
+          also powers Gmail inbox scanning and Google Tasks; the same
+          Microsoft connection powers Outlook Mail scanning and Microsoft
+          To Do.
         </p>
       </details>
 
       <details class="reveal">
-        <summary>I'm not a student — does this still work? <span class="plus" aria-hidden="true"></span></summary>
+        <summary>How does email scanning actually work? <span class="plus" aria-hidden="true"></span></summary>
         <p>
-          Yes. The LMS integrations (Canvas today, Google Classroom
-          next) are just one way to get tasks in. You can also type
-          tasks into the hub directly, or tell the AI ("I need to finish
-          the report by Thursday, about two hours") and it'll add them.
-          Todoist, Google Tasks, and Microsoft To Do integrations are on
-          the roadmap for professionals.
+          Gmail and Outlook are both supported. Turn on the scanner in
+          setup, and AutoPlan periodically reads your recent unread mail
+          (or a specific label/category if you want to narrow it),
+          sends each one through Claude with a prompt that asks
+          "what actionable tasks does this email give the reader?", and
+          creates the tasks it finds. You pick the flow: <strong>Auto</strong>
+          schedules them immediately, <strong>Review</strong> lands them
+          in the hub's pending queue where you can approve, edit, or
+          remove any of them before they touch your calendar.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Is email scanning private? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          AutoPlan reads email only from your local machine. The copy
+          that goes to Claude is one email at a time, sent directly from
+          your computer to Anthropic's API over TLS, with the prompt
+          asking strictly for task extraction. Anthropic doesn't train
+          on API traffic by default. Nothing is forwarded to us (there
+          is no "us" — no server, no cloud backend, no database). You
+          can scope the scanner to a specific Gmail label or Outlook
+          category if you don't want it seeing every email, and you can
+          cap the number of messages per scan. Turn it off anytime.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Can I switch between Auto and Review mode later? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Yes. Change the radio in the setup window and save — every
+          task source picks up the new mode instantly. Tasks already
+          in the pending queue stay there until you approve or reject
+          them; tasks already on your calendar stay there. The change
+          only affects newly-arriving tasks.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Can I edit a task before it hits my calendar? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Yes, when you're in Review mode. The hub's pending-review
+          section has Approve, Edit, and Reject buttons per task. Edit
+          opens a modal where you can change the title, duration,
+          deadline, priority, and notes. Approving uses whatever you
+          edited. If you change a duration by hand, it gets pinned —
+          the learning loop won't silently overwrite your judgment.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>What if I connect more than one task source? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          AutoPlan merges them. A task on Canvas stays distinct from a
+          task in Todoist even if they're similar — each source owns
+          its own items. If a task you approved in Review mode later
+          gets re-synced from its source, it doesn't bounce back into
+          the pending queue; approved means approved. If a source marks
+          a task "completed" upstream (you checked it off in Todoist,
+          submitted an assignment in Canvas, etc.), AutoPlan closes the
+          local copy and removes the calendar block.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Does AutoPlan learn what my work actually takes? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Yes. Every time you finish a task, AutoPlan records how long it
+          actually took in a local history table. On every plan cycle, the
+          solver re-estimates each active task's duration based on the
+          median of similar past tasks — same category, same title tokens.
+          If you edit a duration by hand, that override is pinned (the
+          scheduler won't overwrite what you explicitly set). Over a few
+          weeks its estimates drift toward what your work really costs.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Which notifier should I pick? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Depends on how you want to get your morning summary and
+          at-risk alerts. <strong>iMessage</strong> — macOS only, silent
+          on your own iPhone because of Apple's own-ID rule, but fine
+          for family members on iCloud. <strong>Pushover</strong> — most
+          reliable mobile push, $5 one-time per platform. <strong>Slack</strong>
+          — free, DMs yourself via an incoming webhook. <strong>Email</strong>
+          — any SMTP provider (Gmail, Outlook, Fastmail, Mailgun, SES).
+          <strong>ntfy.sh</strong> — free, cross-platform, no account; just
+          a secret topic string you subscribe to in a free phone app.
+          The setup wizard has "where do I find this?" instructions for
+          each one.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>What does the setup wizard actually do? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          It opens in your browser, not on the command line. You pick
+          one of each category (calendar, notifier, optional task
+          sources), paste or sign in for each credential, and click
+          Save. It writes a single <code>.env</code> file on your
+          computer and creates a Claude agent in your Anthropic account.
+          Google and Microsoft get dedicated sub-wizards that walk you
+          through their respective developer consoles click by click —
+          everything, including OAuth sign-in, happens inside the
+          AutoPlan window. You can come back and change any setting
+          later by re-running the wizard.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>What kinds of work does this handle? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Anything with a duration and (optionally) a deadline. Client
+          proposals, code reviews, legal prep, content drafts, reading,
+          learning, personal projects, job-search stuff, board-meeting
+          prep, homework, paperwork — if you can put a label on it and
+          estimate how long it'll take, AutoPlan can schedule it. It
+          treats a board deck the same way it treats "write the Q3
+          OKR doc" the same way it treats a term paper. The only
+          difference is which tool it pulls the task from.
         </p>
       </details>
 
