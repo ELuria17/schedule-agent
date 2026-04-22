@@ -407,6 +407,28 @@
     margin-top: 20px; color: var(--ink-3); font-size: 13px; line-height: 1.55;
     max-width: 52ch; margin-left: auto; margin-right: auto;
   }
+  .gatekeeper-steps {
+    margin-top: 32px; padding-top: 28px;
+    border-top: 1px solid var(--border-soft);
+    text-align: left;
+  }
+  .gatekeeper-steps p {
+    color: var(--ink-2); font-size: 15px; line-height: 1.6;
+    max-width: 62ch; margin: 0 auto;
+  }
+  .gatekeeper-steps p strong { color: var(--ink-1); }
+  .gatekeeper-steps ol {
+    margin: 16px auto 0;
+    max-width: 62ch;
+    padding-left: 24px;
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .gatekeeper-steps li { margin-bottom: 10px; }
+  .gatekeeper-steps li::marker { color: var(--accent); font-weight: 500; }
+  .gatekeeper-steps li strong { color: var(--ink-1); font-weight: 600; }
+  .gatekeeper-steps li em { color: var(--ink-2); }
 
   /* ---------- FAQ ---------- */
   .faq { margin-top: 40px; }
@@ -1153,14 +1175,31 @@
          href="https://github.com/ELuria17/schedule-agent/releases/latest/download/schedule-agent.dmg">
         Download the Mac app <span class="arrow">→</span>
       </a>
-      <p class="note">
-        <strong>First time you open it</strong>, macOS will say "cannot be
-        opened because the developer cannot be verified." That's a default
-        security warning — AutoPlan is safe, it's just not signed yet.
-        The one-time fix: in Finder, <strong>right-click</strong> the
-        AutoPlan app and choose <strong>Open</strong>. After that, it
-        opens normally forever.
-      </p>
+
+      <div class="gatekeeper-steps">
+        <p>
+          <strong>First time you open it</strong>, macOS will say
+          <em>"Apple could not verify AutoPlan is free of malware."</em>
+          That's the default warning for any app that isn't signed with
+          a paid Apple Developer account — AutoPlan is safe, it's just
+          not signed <em>yet</em>. Here's the one-time fix:
+        </p>
+        <ol>
+          <li>Click <strong>Done</strong> on the warning (not "Move to Trash").</li>
+          <li>Open <strong>System Settings</strong>.</li>
+          <li>In the sidebar, click <strong>Privacy &amp; Security</strong>.</li>
+          <li>Scroll down to the <strong>Security</strong> section. You'll see a grey line saying
+            <em>"schedule-agent was blocked to protect your Mac."</em>
+            Click the <strong>Open Anyway</strong> button next to it.
+            Touch ID or password if prompted.</li>
+          <li>Open the AutoPlan app again. A new dialog now has an
+            <strong>Open</strong> button — click it.</li>
+        </ol>
+        <p style="margin-top: 14px;">
+          From now on it opens with a normal double-click. No more
+          warnings. One click per machine, forever.
+        </p>
+      </div>
     </div>
 
     <div class="reveal" style="margin-top: 32px; text-align: center;">
