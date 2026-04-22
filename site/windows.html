@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoPlan on Windows — full walkthrough</title>
+<meta name="description" content="Step-by-step Windows install walkthrough for AutoPlan. 15 minutes, copy-paste commands, no prior setup assumed.">
+<link rel="icon" type="image/png" href="assets/autoplan-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --canvas:      oklch(0.985 0.004 80);
+    --canvas-2:    oklch(0.97  0.006 80);
+    --surface:     oklch(0.94  0.008 80);
+    --border:      oklch(0.88  0.010 80);
+    --border-soft: oklch(0.93  0.008 80);
+    --ink-1:       oklch(0.20  0.012 70);
+    --ink-2:       oklch(0.46  0.014 70);
+    --ink-3:       oklch(0.60  0.014 70);
+    --accent:      oklch(0.52  0.15  45);
+    --accent-quiet: oklch(0.94 0.04  50);
+    --accent-on:   oklch(0.99  0.005 80);
+    --font-display: "Bricolage Grotesque", -apple-system, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --canvas:      oklch(0.14 0.008 60);
+    --canvas-2:    oklch(0.17 0.008 60);
+    --surface:     oklch(0.20 0.010 60);
+    --border:      oklch(0.30 0.012 60);
+    --border-soft: oklch(0.22 0.010 60);
+    --ink-1:       oklch(0.96 0.010 80);
+    --ink-2:       oklch(0.72 0.014 70);
+    --ink-3:       oklch(0.54 0.014 70);
+    --accent:      oklch(0.80 0.14  55);
+    --accent-quiet: oklch(0.30 0.06  55);
+    --accent-on:   oklch(0.15 0.025 55);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --canvas:      oklch(0.14 0.008 60);
+      --canvas-2:    oklch(0.17 0.008 60);
+      --surface:     oklch(0.20 0.010 60);
+      --border:      oklch(0.30 0.012 60);
+      --border-soft: oklch(0.22 0.010 60);
+      --ink-1:       oklch(0.96 0.010 80);
+      --ink-2:       oklch(0.72 0.014 70);
+      --ink-3:       oklch(0.54 0.014 70);
+      --accent:      oklch(0.80 0.14  55);
+      --accent-quiet: oklch(0.30 0.06  55);
+      --accent-on:   oklch(0.15 0.025 55);
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+  body {
+    background: var(--canvas); color: var(--ink-1);
+    font-family: var(--font-display);
+    font-size: 17px; line-height: 1.65;
+  }
+  ::selection { background: var(--accent-quiet); color: var(--ink-1); }
+
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+
+  nav.top {
+    padding: 18px 0; border-bottom: 1px solid var(--border-soft);
+    background: var(--canvas);
+  }
+  nav.top .wrap { display: flex; align-items: center; gap: 24px; }
+  nav.top .brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 17px; color: var(--ink-1);
+    text-decoration: none;
+  }
+  nav.top .brand-mark {
+    width: 26px; height: 26px; border-radius: 6px; background: var(--ink-1);
+    color: var(--canvas); display: grid; place-items: center;
+  }
+  nav.top .brand-mark svg { width: 16px; height: 16px; }
+  nav.top .back {
+    margin-left: auto;
+    font-size: 14px; color: var(--ink-2); text-decoration: none;
+  }
+  nav.top .back:hover { color: var(--accent); }
+
+  header.page-head {
+    padding: clamp(56px, 8vw, 88px) 0 clamp(32px, 4vw, 48px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  header.page-head .eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 14px;
+  }
+  header.page-head h1 {
+    font-size: clamp(32px, 5vw, 52px); font-weight: 500;
+    line-height: 1.06; letter-spacing: -0.03em;
+    margin-bottom: 16px;
+  }
+  header.page-head .lede {
+    color: var(--ink-2); font-size: 17px; max-width: 58ch;
+  }
+
+  article { padding: 48px 0 96px; }
+  article h2 {
+    font-size: clamp(22px, 3vw, 28px); font-weight: 500;
+    letter-spacing: -0.02em; margin: 48px 0 16px;
+    padding-top: 32px; border-top: 1px solid var(--border-soft);
+  }
+  article h2:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+  article h3 {
+    font-size: 18px; font-weight: 500;
+    margin: 28px 0 10px;
+  }
+  article p { color: var(--ink-2); margin-bottom: 16px; max-width: 64ch; }
+  article p strong { color: var(--ink-1); font-weight: 600; }
+  article a { color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-quiet); text-underline-offset: 3px; }
+  article a:hover { text-decoration-color: var(--accent); }
+
+  article ol, article ul {
+    margin: 16px 0 20px 22px;
+    color: var(--ink-2);
+  }
+  article li {
+    margin-bottom: 10px; line-height: 1.65;
+  }
+  article li::marker { color: var(--ink-3); }
+  article li strong { color: var(--ink-1); font-weight: 600; }
+
+  code {
+    font-family: var(--font-mono); font-size: 0.88em;
+    background: var(--surface); color: var(--ink-1);
+    padding: 2px 6px; border-radius: 4px;
+  }
+  pre {
+    font-family: var(--font-mono); font-size: 14px; line-height: 1.7;
+    background: var(--canvas-2); color: var(--ink-1);
+    border: 1px solid var(--border-soft); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto;
+    margin: 14px 0 22px;
+  }
+  pre code { background: transparent; padding: 0; font-size: 14px; }
+
+  blockquote {
+    border-left: 2px solid var(--accent);
+    padding: 4px 0 4px 18px;
+    margin: 16px 0 22px;
+    color: var(--ink-2); font-size: 15px;
+  }
+
+  .callout {
+    padding: 18px 22px;
+    background: var(--canvas-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    margin: 20px 0;
+  }
+  .callout strong { color: var(--ink-1); }
+
+  footer {
+    padding: 40px 0 72px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--ink-3); font-size: 14px;
+  }
+  footer a { color: var(--ink-2); }
+  footer a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="index.html">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/>
+          <path d="M3 9.5h18"/>
+          <rect x="6" y="12.5" width="9" height="2" rx="1" fill="currentColor"/>
+          <rect x="6" y="16.5" width="12" height="2" rx="1" fill="currentColor"/>
+        </svg>
+      </span>
+      AutoPlan
+    </a>
+    <a class="back" href="index.html">← Back to AutoPlan</a>
+  </div>
+</nav>
+
+<header class="page-head">
+  <div class="wrap">
+    <span class="eyebrow">Install guide</span>
+    <h1>AutoPlan on Windows — full walkthrough.</h1>
+    <p class="lede">
+      Total time: about fifteen minutes, most of it waiting for
+      downloads. Everything below is copy-paste — you won't need to
+      write anything yourself. Just paste the commands into PowerShell
+      one block at a time.
+    </p>
+  </div>
+</header>
+
+<article>
+  <div class="wrap">
+
+    <h2>Step 1 — Install Python (one time, ~3 min)</h2>
+    <p>
+      AutoPlan is written in Python. Windows doesn't ship with it, so
+      you need to install it once.
+    </p>
+    <ol>
+      <li>Go to <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noopener">python.org/downloads/windows</a>.</li>
+      <li>Under <strong>Stable Releases</strong>, click the latest
+        <strong>Python 3</strong> release (3.12 or 3.13; anything 3.9+
+        works).</li>
+      <li>Scroll down to <strong>Files</strong> → click
+        <strong>Windows installer (64-bit)</strong>. Downloads a file
+        like <code>python-3.13.0-amd64.exe</code>.</li>
+      <li>Open the downloaded file. <strong>Important:</strong> on the
+        first screen, <strong>check "Add python.exe to PATH"</strong>
+        at the bottom. Then click <strong>Install Now</strong>.</li>
+      <li>When it finishes, close the installer.</li>
+    </ol>
+    <p><strong>Verify it worked:</strong> press <strong>Windows + R</strong>, type
+      <code>powershell</code>, press Enter. A blue terminal opens. Type:</p>
+<pre><code>python --version</code></pre>
+    <p>
+      You should see <code>Python 3.13.0</code> (or whatever you installed). If
+      it says <em>"python is not recognized"</em>, you missed the PATH
+      checkbox — re-run the installer, choose <strong>Modify</strong>,
+      check the box.
+    </p>
+
+    <h2>Step 2 — Install Git (one time, ~2 min)</h2>
+    <p>Git is the tool that downloads AutoPlan's code.</p>
+    <ol>
+      <li>Go to <a href="https://git-scm.com/download/win" target="_blank" rel="noopener">git-scm.com/download/win</a>.
+        Download starts automatically.</li>
+      <li>Open the downloaded <code>Git-x.x.x-64-bit.exe</code>.</li>
+      <li>Click <strong>Next</strong> through all the defaults. Don't
+        overthink them.</li>
+      <li>Close the installer.</li>
+    </ol>
+    <p><strong>Verify:</strong> back in PowerShell:</p>
+<pre><code>git --version</code></pre>
+    <p>Expect <code>git version 2.45.0.windows.1</code> or similar.</p>
+
+    <h2>Step 3 — Download AutoPlan (~30 seconds)</h2>
+    <p>
+      Pick where on your computer AutoPlan should live. Your user folder
+      is a safe choice. In PowerShell:
+    </p>
+<pre><code>cd $HOME
+git clone https://github.com/ELuria17/schedule-agent.git autoplan
+cd autoplan</code></pre>
+    <p>
+      The <code>git clone</code> line downloads the project into a new
+      folder called <code>autoplan</code> inside your user folder. The
+      <code>cd autoplan</code> line steps inside it.
+    </p>
+
+    <h2>Step 4 — Install AutoPlan's dependencies (~1–2 min)</h2>
+<pre><code>python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt</code></pre>
+    <p>Break-down:</p>
+    <ul>
+      <li><code>python -m venv venv</code> makes a clean, isolated
+        Python environment so it doesn't conflict with anything else.</li>
+      <li><code>venv\Scripts\activate</code> steps into it. You'll know
+        it worked because your prompt now starts with
+        <code>(venv)</code>.</li>
+      <li><code>pip install -r requirements.txt</code> downloads every
+        library AutoPlan needs. You'll see a lot of output; that's
+        normal.</li>
+    </ul>
+    <p>
+      When it's done you should see a line like
+      <code>Successfully installed anthropic-0.96.0 caldav-1.3.9 ...</code>.
+    </p>
+
+    <h2>Step 5 — Launch AutoPlan for the first time (~30 seconds)</h2>
+    <p>Before running the next command, have these two things ready:</p>
+    <ul>
+      <li><strong>An Anthropic API key</strong> — sign up free at
+        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>,
+        click <strong>Create Key</strong>, copy the long string that
+        starts with <code>sk-ant-...</code>. Keep it handy.</li>
+      <li><strong>Your iCloud app-specific password</strong> — go to
+        <a href="https://appleid.apple.com" target="_blank" rel="noopener">appleid.apple.com</a>,
+        sign in, <strong>Sign-In and Security</strong> →
+        <strong>App-Specific Passwords</strong> → <strong>+</strong>,
+        label it "AutoPlan", copy the generated
+        <code>xxxx-xxxx-xxxx-xxxx</code> code. This lets AutoPlan
+        access your iCloud calendar without your real Apple password.</li>
+    </ul>
+    <p>Then run:</p>
+<pre><code>python run.py</code></pre>
+    <p>A few things happen:</p>
+    <ol>
+      <li>The first time, <strong>Windows Firewall</strong> pops up a
+        dialog asking whether Python should be allowed on the network.
+        Click <strong>Allow</strong> (private networks is enough).</li>
+      <li>Your default browser opens automatically to a setup page —
+        <code>http://127.0.0.1:8787/setup</code>.</li>
+      <li>Fill in the form:
+        <ul>
+          <li><strong>Anthropic API key</strong> — paste the one you copied.</li>
+          <li><strong>Calendar</strong> — <em>iCloud</em>, plus your
+            primary Apple ID email and the app-specific password.</li>
+          <li><strong>Task source</strong> — if you're a student with
+            Canvas, <em>Canvas</em> + prompts. Otherwise
+            <em>None / manual only</em> — you can type tasks into the
+            hub directly.</li>
+          <li><strong>Notifier</strong> — <em>ntfy.sh</em> is
+            pre-selected. Copy the topic the wizard generates for you;
+            you'll use it on your phone in a minute.</li>
+        </ul>
+      </li>
+      <li>Click <strong>Save and create Anthropic agent</strong>.</li>
+    </ol>
+    <p>
+      When the success page appears, close the browser tab and go back
+      to PowerShell. Press <strong>Ctrl+C</strong> to stop AutoPlan for
+      a moment.
+    </p>
+
+    <h2>Step 6 — Get phone notifications (~2 min)</h2>
+    <p>Install the <strong>ntfy</strong> app on your phone (free, no account):</p>
+    <ul>
+      <li>iPhone: <a href="https://apps.apple.com/us/app/ntfy/id1625396347" target="_blank" rel="noopener">apps.apple.com — ntfy</a></li>
+      <li>Android: <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">play.google.com — ntfy</a></li>
+    </ul>
+    <p>
+      Open the ntfy app, tap <strong>+</strong> to add a subscription,
+      and paste the <strong>topic</strong> the setup wizard generated.
+      Done — every morning summary AutoPlan sends will appear as a push
+      notification on your phone.
+    </p>
+    <blockquote>
+      The topic is a secret: anyone who knows it can both read and send
+      messages on it. Don't share it.
+    </blockquote>
+
+    <h2>Step 7 — Use AutoPlan day-to-day</h2>
+    <p>Start it up whenever you want to use it:</p>
+<pre><code>cd $HOME\autoplan
+venv\Scripts\activate
+python run.py</code></pre>
+    <p>
+      Your browser opens to the hub at
+      <code>http://127.0.0.1:8787/hub?key=&lt;your-token&gt;</code>.
+      Bookmark it — that's the page you'll come back to every day.
+    </p>
+    <p>When you're done, go to PowerShell and press <strong>Ctrl+C</strong>.</p>
+
+    <h3>Making it easier to launch</h3>
+    <p>
+      AutoPlan comes with a file called <code>run.bat</code> that does
+      all three of the above lines for you. You can:
+    </p>
+    <ul>
+      <li><strong>Double-click</strong> <code>run.bat</code> in File
+        Explorer to start AutoPlan.</li>
+      <li>Make a shortcut: right-click <code>run.bat</code> →
+        <strong>Send to</strong> →
+        <strong>Desktop (create shortcut)</strong>. Now AutoPlan is one
+        click from the desktop.</li>
+      <li><strong>Launch at login</strong>: press
+        <strong>Windows + R</strong>, type <code>shell:startup</code>,
+        press Enter. Drag the shortcut you made into the folder that
+        opens. AutoPlan will start automatically whenever you sign in.</li>
+    </ul>
+
+    <h2>Troubleshooting</h2>
+
+    <h3>"python is not recognized"</h3>
+    <p>
+      You missed the "Add to PATH" checkbox during install (Step 1).
+      Re-run the Python installer, click <strong>Modify</strong>, check
+      the box.
+    </p>
+
+    <h3>"git is not recognized"</h3>
+    <p>
+      Close PowerShell and open a new window. If it still doesn't work,
+      reinstall Git and make sure "Git from the command line and also
+      from 3rd-party software" is selected during the installer.
+    </p>
+
+    <h3>The ntfy app doesn't receive notifications</h3>
+    <ul>
+      <li>Check you subscribed to the exact same topic the setup wizard
+        generated (it's in the <code>.env</code> file in the
+        <code>autoplan</code> folder, under
+        <code>NTFY_TOPIC=</code>).</li>
+      <li>On iPhone: make sure notifications are on for ntfy in iOS
+        Settings → Notifications → ntfy.</li>
+    </ul>
+
+    <h3>Windows SmartScreen blocks run.bat</h3>
+    <p>
+      If you see "Windows protected your PC," click
+      <strong>More info</strong> → <strong>Run anyway</strong>.
+      SmartScreen is cautious about unsigned scripts. This only happens
+      the first time.
+    </p>
+
+    <h3>Something else broke</h3>
+    <p>
+      Open an issue at
+      <a href="https://github.com/ELuria17/schedule-agent/issues" target="_blank" rel="noopener">github.com/ELuria17/schedule-agent/issues</a>
+      with the exact error message copied from PowerShell.
+    </p>
+
+    <div class="callout" style="margin-top: 48px;">
+      <p style="margin-bottom: 0;">
+        <strong>All set.</strong> If AutoPlan is running and your phone
+        got its first notification, you're done. Head back to the
+        <a href="index.html">main page</a> or straight to your hub at
+        <code>http://127.0.0.1:8787/hub</code>.
+      </p>
+    </div>
+  </div>
+</article>
+
+<footer>
+  <div class="wrap">
+    <p>MIT licensed. Made by Eytan Luria.
+      <a href="https://github.com/ELuria17/schedule-agent" target="_blank" rel="noopener" style="margin-left: 12px;">Source on GitHub</a></p>
+  </div>
+</footer>
+
+<script>
+  // Honor the theme preference the user set on the main site.
+  const saved = localStorage.getItem('autoplan-theme');
+  if (saved === 'dark' || saved === 'light') {
+    document.documentElement.setAttribute('data-theme', saved);
+  }
+</script>
+
+</body>
+</html>

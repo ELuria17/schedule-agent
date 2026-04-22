@@ -64,8 +64,22 @@ class ICloudCalDAVProvider(CalendarProvider):
         app_password: str,
         write_calendar_name: str = "Study Blocks",
         read_calendar_allowlist: Optional[list[str]] = None,
+        url: str = "https://caldav.icloud.com/",
         timeout: int = 20,
     ):
+        """
+        url: CalDAV server URL. Defaults to iCloud. Other known endpoints:
+            Fastmail     → https://caldav.fastmail.com/
+            Posteo       → https://posteo.de:8443/
+            Mailbox.org  → https://dav.mailbox.org/
+            Nextcloud    → https://your-nextcloud/remote.php/dav/
+            Radicale     → your self-hosted Radicale URL
+            Apple Server → https://<host>:<port>/
+        For those, `username` is whatever the service uses (email, login
+        handle, …), and `app_password` is the service's equivalent — a
+        "mail/CalDAV password" on Fastmail, a regular password on
+        self-hosted installs, etc.
+        """
         self.username = username
         self.app_password = app_password
         self.write_calendar_name = write_calendar_name
@@ -73,6 +87,7 @@ class ICloudCalDAVProvider(CalendarProvider):
             {n.lower() for n in read_calendar_allowlist}
             if read_calendar_allowlist is not None else None
         )
+        self.url = url
         self.timeout = timeout
         self._principal: Optional[caldav.Principal] = None
 
@@ -161,6 +176,7 @@ class ICloudCalDAVProvider(CalendarProvider):
     def health_check(self) -> dict:
         info = {
             "provider": "ICloudCalDAVProvider",
+            "server_url": self.url,
             "write_calendar": self.write_calendar_name,
             "read_allowlist": sorted(self.read_allowlist) if self.read_allowlist else "all",
         }
@@ -179,7 +195,7 @@ class ICloudCalDAVProvider(CalendarProvider):
     def _principal_conn(self) -> caldav.Principal:
         if self._principal is None:
             client = caldav.DAVClient(
-                url="https://caldav.icloud.com/",
+                url=self.url,
                 username=self.username, password=self.app_password,
             )
             self._principal = client.principal()
@@ -298,3 +314,9 @@ def _escape_ical_text(s: str) -> str:
         .replace(",", "\\,")
         .replace("\n", "\\n")
     )
+
+
+# Convenience alias: same class, different default name. Use this when
+# you're pointing at Fastmail / Posteo / Nextcloud / self-hosted Radicale.
+# Behaviorally identical; the name just makes schedule_config.py clearer.
+GenericCalDAVProvider = ICloudCalDAVProvider

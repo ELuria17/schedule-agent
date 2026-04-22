@@ -228,48 +228,32 @@ to the solver's near-term window (see `CanvasTaskSource._is_relevant`: -3d
 to +21d by default). Returning everything forever wastes bandwidth and
 context — trim at the provider boundary.
 
-### Sketch: Todoist task source
+### Live: Todoist task source
 
-```python
-# providers/todoist_task_source.py
-import requests
-from .task_source import SourceTask, TaskSource
+A full implementation ships at `providers/todoist_task_source.py`.
+Reference it when you're writing the next task source — it's the
+simplest real provider in the repo (no OAuth, single HTTP endpoint,
+~150 lines including docstrings).
 
-class TodoistTaskSource(TaskSource):
-    SOURCE = "todoist"
+The interface it implements is identical to `CanvasTaskSource`'s.
+Differences worth noting:
 
-    def __init__(self, *, token: str, project_filter: list[str] | None = None,
-                 require_approval: bool = False):
-        self.token = token
-        self.projects = project_filter
-        self.require_approval = require_approval
+- **Auth is a token string** from Todoist Settings → Integrations →
+  Developer. No OAuth dance.
+- **Duration is a default**, not a field — Todoist doesn't have native
+  durations, so `default_duration_min` on the constructor sets the
+  estimate for every imported task. Users edit per-task in the hub.
+- **`course` = first label** on the task — lets the todo-cross-reference
+  heuristic still work (`TODO_LIST_TO_COURSE` in schedule_config maps
+  label names to courses).
+- **Project and label filters** (`project_ids=`, `label_filter=`) let
+  you scope a single Todoist account to just "the stuff AutoPlan should
+  schedule" without mixing in grocery lists.
 
-    def list_active_tasks(self):
-        r = requests.get(
-            "https://api.todoist.com/rest/v2/tasks",
-            headers={"Authorization": f"Bearer {self.token}"},
-            timeout=30,
-        )
-        r.raise_for_status()
-        out = []
-        for t in r.json():
-            if self.projects and t.get("project_id") not in self.projects:
-                continue
-            out.append(SourceTask(
-                source=self.SOURCE, source_id=str(t["id"]),
-                title=t["content"],
-                course=t.get("labels", [None])[0],
-                deadline_utc=_parse_iso(t.get("due", {}).get("datetime")),
-                is_completed=t.get("is_completed", False),
-                notes=t.get("description"),
-            ))
-        return out
-
-    def health_check(self):
-        return {"source": self.SOURCE,
-                "require_approval": self.require_approval,
-                "projects": self.projects or "all"}
-```
+Test file at `tests/test_todoist_provider.py` — 14 cases covering the
+happy path, priority mapping, date-only due-date handling, filter
+combinations, and error paths. Copy the file structure when writing
+tests for a new provider.
 
 ---
 

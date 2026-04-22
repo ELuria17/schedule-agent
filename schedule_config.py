@@ -17,8 +17,11 @@ import time — fail-fast, by design.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import Optional
+
+_IS_MACOS = sys.platform == "darwin"
 
 # Base ABCs (used for type hints only — never instantiated directly).
 from providers.base import CalendarProvider
@@ -29,11 +32,15 @@ from providers.notifier import Notifier
 # ----------------------------- Concrete impls -----------------------------
 # Import only the ones you plan to use. Unused imports are harmless but noisy.
 
-from providers.icloud_caldav import ICloudCalDAVProvider
+from providers.icloud_caldav import ICloudCalDAVProvider, GenericCalDAVProvider
 from providers.canvas_task_source import CanvasTaskSource
+from providers.todoist_task_source import TodoistTaskSource
 from providers.apple_reminders import AppleRemindersTodoSource
 from providers.imessage_notifier import IMessageNotifier
 from providers.ntfy_notifier import NtfyNotifier
+from providers.pushover_notifier import PushoverNotifier
+from providers.email_notifier import EmailNotifier
+from providers.slack_notifier import SlackNotifier
 
 
 _PROJECT_DIR = Path(__file__).resolve().parent
@@ -99,17 +106,28 @@ TODO_LIST_TO_COURSE: dict[str, str] = {
 # =======================================================================
 # CALENDAR PROVIDER  — where the solver writes Study Blocks.
 # =======================================================================
-# Today: iCloud CalDAV. Alternatives (planned): Google Calendar,
-# Microsoft Graph (Outlook), generic CalDAV server.
+# iCloud is the default. For any other CalDAV-speaking server (Fastmail,
+# Posteo, Mailbox.org, Nextcloud, self-hosted Radicale), swap the
+# constructor for GenericCalDAVProvider below and set CALDAV_URL.
+# Google Calendar and Microsoft Outlook need OAuth2 and are next on the
+# roadmap — see docs/providers.md.
 
-CALENDAR: CalendarProvider = ICloudCalDAVProvider(
-    username=os.environ["ICLOUD_USER"],
-    app_password=os.environ["ICLOUD_APP_PASSWORD"],
-    write_calendar_name=os.environ.get("WRITE_CALENDAR_NAME", "Study Blocks"),
-    # Uncomment + populate to restrict which calendars the solver treats
-    # as busy-time context. By default every non-write calendar counts.
-    # read_calendar_allowlist=["Eytan", "School", "Family"],
-)
+if os.environ.get("CALDAV_URL"):
+    CALENDAR: CalendarProvider = GenericCalDAVProvider(
+        url=os.environ["CALDAV_URL"],
+        username=os.environ["CALDAV_USER"],
+        app_password=os.environ["CALDAV_PASSWORD"],
+        write_calendar_name=os.environ.get("WRITE_CALENDAR_NAME", "Study Blocks"),
+    )
+else:
+    CALENDAR: CalendarProvider = ICloudCalDAVProvider(
+        username=os.environ["ICLOUD_USER"],
+        app_password=os.environ["ICLOUD_APP_PASSWORD"],
+        write_calendar_name=os.environ.get("WRITE_CALENDAR_NAME", "Study Blocks"),
+        # Uncomment + populate to restrict which calendars the solver treats
+        # as busy-time context. By default every non-write calendar counts.
+        # read_calendar_allowlist=["Eytan", "School", "Family"],
+    )
 
 
 # =======================================================================
@@ -119,60 +137,102 @@ CALENDAR: CalendarProvider = ICloudCalDAVProvider(
 # Today: Canvas LMS. Alternatives (planned): Brightspace, Moodle, Notion,
 # Linear, GitHub Issues, a CSV file, "manual only".
 
-TASK_SOURCES: list[TaskSource] = [
-    CanvasTaskSource(
+TASK_SOURCES: list[TaskSource] = []
+
+# --- Canvas LMS --- (students). Uncomment if you track work in Canvas.
+if os.environ.get("CANVAS_TOKEN"):
+    TASK_SOURCES.append(CanvasTaskSource(
         base_url=os.environ.get("CANVAS_BASE_URL",
                                 "https://psu.instructure.com/api/v1"),
         token=os.environ["CANVAS_TOKEN"],
         # Set to True if you want every new Canvas assignment to land in the
-        # pending-review queue (visible in the hub) before it's eligible for
-        # scheduling. Default False = trust Canvas, schedule immediately.
+        # pending-review queue before it's eligible for scheduling.
         require_approval=False,
-    ),
-]
+    ))
+
+# --- Todoist --- (professionals; works on any platform).
+# Generate a token at Settings → Integrations → Developer in the Todoist
+# web app, then set TODOIST_TOKEN in .env.
+if os.environ.get("TODOIST_TOKEN"):
+    TASK_SOURCES.append(TodoistTaskSource(
+        token=os.environ["TODOIST_TOKEN"],
+        # Optional: only pull from specific Todoist projects (IDs are
+        # strings). Leave as None / unset to pull from all projects.
+        # project_ids=["2337281111"],
+        # Optional: only pull tasks tagged with one of these labels.
+        # label_filter=["focus"],
+        default_duration_min=45,
+        require_approval=False,
+    ))
 
 
 # =======================================================================
 # TODO SOURCE  — optional "user checked something off in their to-do app"
 # signal used to auto-close matching tasks.
 # =======================================================================
-# Today: Apple Reminders (macOS only). Alternatives (planned): Todoist,
-# Google Tasks, TickTick, MS To Do. Set to None to disable.
+# Apple Reminders is macOS-only. On Windows / Linux this defaults to None
+# (no todo cross-reference); swap in a cloud-API TodoSource like Todoist
+# or Google Tasks when one lands in providers/.
 
 from paths import reminders_fetch_binary_path
 
-TODO_SOURCE: Optional[TodoSource] = AppleRemindersTodoSource(
-    binary_path=str(reminders_fetch_binary_path()),
+TODO_SOURCE: Optional[TodoSource] = (
+    AppleRemindersTodoSource(binary_path=str(reminders_fetch_binary_path()))
+    if _IS_MACOS else None
 )
 
 
 # =======================================================================
 # NOTIFIER  — how the agent reaches you with the daily summary / updates.
 # =======================================================================
-# Swap one of the options below. They all implement the same `Notifier`
-# interface — the agent and orchestrator don't care which you pick.
+# The first env var that's set wins, in the order below. To force a
+# specific notifier, replace the `_pick_notifier()` call with the single
+# constructor you want.
 #
-# Option 1: iMessage (macOS only; Mac must be signed in to Messages.app).
-#           Self-send does NOT push-notify (ROADBLOCKS §M2); shows as
-#           badge on Messages.app.
-#
-# Option 2: ntfy.sh (cross-platform, free, no account).
-#           Install the ntfy app on phone, subscribe to the same topic.
-#           Actual push notifications on any platform.
+# Supported, in priority order:
+#   1. iMessage (macOS only) — if USER_PHONE is set.
+#   2. Pushover               — if PUSHOVER_USER_KEY and PUSHOVER_APP_TOKEN.
+#   3. Slack                  — if SLACK_WEBHOOK_URL.
+#   4. Email (SMTP)           — if SMTP_HOST + SMTP_USERNAME + SMTP_PASSWORD.
+#   5. ntfy.sh                — if NTFY_TOPIC (default fallback, cross-platform).
 
-NOTIFIER: Notifier = IMessageNotifier(
-    script_path=str(_PROJECT_DIR / "macos" / "send_imessage.applescript"),
-    recipient=os.environ["USER_PHONE"],
-)
+def _pick_notifier() -> Notifier:
+    if _IS_MACOS and os.environ.get("USER_PHONE"):
+        return IMessageNotifier(
+            script_path=str(_PROJECT_DIR / "macos" / "send_imessage.applescript"),
+            recipient=os.environ["USER_PHONE"],
+        )
+    if os.environ.get("PUSHOVER_USER_KEY") and os.environ.get("PUSHOVER_APP_TOKEN"):
+        return PushoverNotifier(
+            user_key=os.environ["PUSHOVER_USER_KEY"],
+            app_token=os.environ["PUSHOVER_APP_TOKEN"],
+            device=os.environ.get("PUSHOVER_DEVICE") or None,
+        )
+    if os.environ.get("SLACK_WEBHOOK_URL"):
+        return SlackNotifier(
+            webhook_url=os.environ["SLACK_WEBHOOK_URL"],
+            username=os.environ.get("SLACK_USERNAME") or "AutoPlan",
+            icon_emoji=os.environ.get("SLACK_ICON_EMOJI") or ":calendar:",
+        )
+    if (os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USERNAME")
+            and os.environ.get("SMTP_PASSWORD")):
+        return EmailNotifier(
+            smtp_host=os.environ["SMTP_HOST"],
+            smtp_port=int(os.environ.get("SMTP_PORT", "587")),
+            username=os.environ["SMTP_USERNAME"],
+            password=os.environ["SMTP_PASSWORD"],
+            from_addr=os.environ.get("SMTP_FROM") or os.environ["SMTP_USERNAME"],
+            to_addr=os.environ.get("SMTP_TO") or os.environ["SMTP_USERNAME"],
+            use_tls=os.environ.get("SMTP_USE_TLS", "1") not in ("0", "false", "False"),
+            use_ssl=os.environ.get("SMTP_USE_SSL", "0") in ("1", "true", "True"),
+        )
+    # Default fallback — works anywhere with a phone and the free ntfy app.
+    return NtfyNotifier(
+        topic=os.environ["NTFY_TOPIC"],
+        default_tags=["calendar"],
+    )
 
-# To switch to ntfy.sh: comment the block above and uncomment the one
-# below. Set NTFY_TOPIC in `.env` to a hard-to-guess string — anyone
-# with that topic can publish to and read your notifications.
-#
-# NOTIFIER: Notifier = NtfyNotifier(
-#     topic=os.environ["NTFY_TOPIC"],
-#     default_tags=["calendar"],
-# )
+NOTIFIER: Notifier = _pick_notifier()
 
 
 # =======================================================================

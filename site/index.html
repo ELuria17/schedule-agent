@@ -3,37 +3,82 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>schedule-agent — self-hosted Motion, minus the subscription</title>
-<meta name="description" content="Reads your tasks, respects your calendar, and pings you when something's at risk. Runs on your Mac. Open source, MIT-licensed, bring your own Anthropic key.">
-<meta name="theme-color" content="#1d1a17">
-<meta property="og:title" content="schedule-agent">
-<meta property="og:description" content="A self-hosted constraint-solving scheduler. Motion-style, minus the subscription.">
+<title>AutoPlan — AI schedules. You focus.</title>
+<meta name="description" content="AutoPlan reads your tasks and assignments, figures out when you'll actually have time to do them, and blocks your calendar around your classes and meetings. Runs on your Mac. Everything stays with you.">
+<link rel="icon" type="image/png" href="assets/autoplan-logo.png">
+<meta property="og:title" content="AutoPlan — AI schedules. You focus.">
+<meta property="og:description" content="Stop staring at a to-do list wondering when you'll get to things. AutoPlan blocks real time on your calendar around your classes and meetings.">
+<meta property="og:image" content="assets/autoplan-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
+  /* ==================================================================
+     Light mode (default) and dark mode variables.
+     --------------------------------------------------------------------
+     Light is the default. A manual toggle sets data-theme on <html>.
+     If no manual choice, the OS preference wins.
+     ================================================================== */
   :root {
-    --canvas:      oklch(0.12 0.006 60);
-    --canvas-2:    oklch(0.14 0.006 60);
-    --surface:     oklch(0.17 0.008 60);
-    --border:      oklch(0.26 0.010 60);
-    --border-soft: oklch(0.20 0.008 60);
-    --ink-1:       oklch(0.96 0.010 80);
-    --ink-2:       oklch(0.70 0.015 70);
-    --ink-3:       oklch(0.50 0.015 70);
-    --accent:      oklch(0.82 0.14 75);
-    --accent-quiet: oklch(0.30 0.06 75);
-    --accent-on:   oklch(0.14 0.025 75);
+    /* Light mode */
+    --canvas:      oklch(0.985 0.004 80);
+    --canvas-2:    oklch(0.97  0.006 80);
+    --surface:     oklch(0.94  0.008 80);
+    --border:      oklch(0.88  0.010 80);
+    --border-soft: oklch(0.93  0.008 80);
+    --ink-1:       oklch(0.20  0.012 70);
+    --ink-2:       oklch(0.46  0.014 70);
+    --ink-3:       oklch(0.60  0.014 70);
+    --accent:      oklch(0.52  0.15  45);
+    --accent-quiet: oklch(0.94 0.04  50);
+    --accent-on:   oklch(0.99  0.005 80);
+    --shadow-soft: 0 1px 2px oklch(0.20 0.012 70 / 0.04),
+                   0 8px 24px oklch(0.20 0.012 70 / 0.06);
 
     --font-display: "Bricolage Grotesque", -apple-system, system-ui, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 
     --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
-    --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
-    --space-5: 24px; --space-6: 32px; --space-8: 48px; --space-10: 64px;
-    --space-12: 96px; --space-16: 128px;
+    color-scheme: light;
+  }
+
+  /* Dark mode — manual override */
+  :root[data-theme="dark"] {
+    --canvas:      oklch(0.14 0.008 60);
+    --canvas-2:    oklch(0.17 0.008 60);
+    --surface:     oklch(0.20 0.010 60);
+    --border:      oklch(0.30 0.012 60);
+    --border-soft: oklch(0.22 0.010 60);
+    --ink-1:       oklch(0.96 0.010 80);
+    --ink-2:       oklch(0.72 0.014 70);
+    --ink-3:       oklch(0.54 0.014 70);
+    --accent:      oklch(0.80 0.14  55);
+    --accent-quiet: oklch(0.30 0.06  55);
+    --accent-on:   oklch(0.15 0.025 55);
+    --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.4),
+                   0 8px 24px oklch(0 0 0 / 0.3);
+    color-scheme: dark;
+  }
+
+  /* Dark mode — follow OS when user hasn't toggled */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --canvas:      oklch(0.14 0.008 60);
+      --canvas-2:    oklch(0.17 0.008 60);
+      --surface:     oklch(0.20 0.010 60);
+      --border:      oklch(0.30 0.012 60);
+      --border-soft: oklch(0.22 0.010 60);
+      --ink-1:       oklch(0.96 0.010 80);
+      --ink-2:       oklch(0.72 0.014 70);
+      --ink-3:       oklch(0.54 0.014 70);
+      --accent:      oklch(0.80 0.14  55);
+      --accent-quiet: oklch(0.30 0.06  55);
+      --accent-on:   oklch(0.15 0.025 55);
+      --shadow-soft: 0 1px 2px oklch(0 0 0 / 0.4),
+                     0 8px 24px oklch(0 0 0 / 0.3);
+      color-scheme: dark;
+    }
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -43,235 +88,373 @@
     font-family: var(--font-display);
     font-size: 17px; line-height: 1.6;
     font-weight: 400; font-optical-sizing: auto;
+    transition: background 200ms var(--ease-out), color 200ms var(--ease-out);
   }
-  ::selection { background: var(--accent); color: var(--accent-on); }
+  ::selection { background: var(--accent-quiet); color: var(--ink-1); }
 
-  a { color: var(--ink-1); text-decoration: none;
-      border-bottom: 1px solid var(--border);
-      transition: border-color 160ms var(--ease-out), color 160ms var(--ease-out); }
-  a:hover { border-color: var(--accent); color: var(--accent); }
+  a { color: var(--ink-1); text-decoration: underline;
+      text-decoration-color: var(--border);
+      text-underline-offset: 3px; text-decoration-thickness: 1px;
+      transition: text-decoration-color 160ms var(--ease-out), color 160ms var(--ease-out); }
+  a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
   code {
     font-family: var(--font-mono); font-size: 0.88em;
     background: var(--surface); color: var(--ink-1);
-    padding: 2px 6px; border-radius: 3px;
-  }
-  pre {
-    font-family: var(--font-mono); font-size: 13.5px; line-height: 1.7;
-    background: var(--canvas-2); color: var(--ink-1);
-    border: 1px solid var(--border-soft); border-radius: 8px;
-    padding: 16px 18px; overflow-x: auto;
-  }
-  pre code { background: transparent; padding: 0; }
-
-  /* ---------- layout primitives ---------- */
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
-  .row { display: grid; gap: var(--space-6); }
-  @media (min-width: 840px) {
-    .row-split  { grid-template-columns: 5fr 7fr; align-items: baseline; }
-    .row-label  { grid-template-columns: 3fr 9fr; align-items: baseline; }
+    padding: 2px 6px; border-radius: 4px;
   }
 
-  /* ---------- navigation ---------- */
+  /* ---------- layout ---------- */
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+  .wrap-narrow { max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- nav ---------- */
   nav.top {
-    padding: 20px 0;
+    padding: 18px 0;
     border-bottom: 1px solid var(--border-soft);
     position: sticky; top: 0; z-index: 10;
-    background: color-mix(in oklch, var(--canvas) 92%, transparent);
-    backdrop-filter: blur(8px);
+    background: color-mix(in oklch, var(--canvas) 90%, transparent);
+    backdrop-filter: blur(10px);
   }
-  nav.top .wrap { display: flex; justify-content: space-between; align-items: center; }
+  nav.top .wrap { display: flex; align-items: center; gap: 24px; }
   nav.top .brand {
-    font-weight: 600; font-size: 16px; letter-spacing: -0.01em;
-    border: 0;
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 17px; letter-spacing: -0.01em;
+    color: var(--ink-1); text-decoration: none;
   }
-  nav.top .brand .dot {
-    display: inline-block; width: 6px; height: 6px; border-radius: 999px;
-    background: var(--accent); margin-right: 8px; transform: translateY(-2px);
+  nav.top .brand-mark {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: var(--ink-1);
+    display: grid; place-items: center;
+    color: var(--canvas);
   }
-  nav.top .nav-links { display: flex; gap: 24px; font-size: 14px; }
-  nav.top .nav-links a { color: var(--ink-2); border: 0; }
+  nav.top .brand-mark svg { width: 16px; height: 16px; }
+  nav.top .nav-spacer { flex: 1; }
+  nav.top .nav-links { display: flex; gap: 28px; font-size: 14px; }
+  nav.top .nav-links a { color: var(--ink-2); text-decoration: none; }
   nav.top .nav-links a:hover { color: var(--ink-1); }
   @media (max-width: 640px) { nav.top .nav-links { display: none; } }
 
+  .theme-toggle {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--ink-2); cursor: pointer;
+    display: grid; place-items: center;
+    transition: background 160ms var(--ease-out),
+                color 160ms var(--ease-out),
+                border-color 160ms var(--ease-out),
+                transform 160ms var(--ease-out);
+  }
+  .theme-toggle:hover { color: var(--ink-1); border-color: var(--ink-2); }
+  .theme-toggle:active { transform: scale(0.94); }
+  .theme-toggle svg { width: 16px; height: 16px; }
+  :root[data-theme="dark"] .theme-toggle .icon-sun,
+  :root:not([data-theme]) .theme-toggle .icon-sun { display: inline; }
+  :root[data-theme="dark"] .theme-toggle .icon-moon,
+  :root:not([data-theme]) .theme-toggle .icon-moon { display: none; }
+  :root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+  :root[data-theme="light"] .theme-toggle .icon-moon { display: inline; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .theme-toggle .icon-sun { display: none; }
+    :root:not([data-theme]) .theme-toggle .icon-moon { display: inline; }
+  }
+
   /* ---------- hero ---------- */
-  header.hero { padding: clamp(72px, 14vw, 140px) 0 clamp(64px, 10vw, 112px); }
-  header.hero .eyebrow {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
-    color: var(--accent); letter-spacing: 0.02em;
-    margin-bottom: 28px;
+  header.hero {
+    padding: clamp(64px, 11vw, 120px) 0 clamp(56px, 9vw, 100px);
+    text-align: center;
   }
-  header.hero .eyebrow::before {
-    content: ""; width: 6px; height: 6px; border-radius: 999px;
-    background: var(--accent); display: inline-block;
+  .hero-logo {
+    width: clamp(140px, 24vw, 220px);
+    height: auto; aspect-ratio: 1 / 1;
+    margin: 0 auto clamp(32px, 5vw, 56px);
+    display: block;
+    border-radius: 20px;
+    background: #fff;
+    padding: 12px;
+    box-shadow: var(--shadow-soft);
   }
+  :root[data-theme="dark"] .hero-logo { background: #fff; /* always white so logo reads */ }
   header.hero h1 {
-    font-size: clamp(40px, 6vw, 76px); font-weight: 500;
-    line-height: 1.02; letter-spacing: -0.035em;
-    max-width: 16ch;
-    margin-bottom: 28px;
+    font-size: clamp(38px, 6.2vw, 72px); font-weight: 500;
+    line-height: 1.03; letter-spacing: -0.035em;
+    max-width: 18ch; margin: 0 auto 24px;
   }
-  header.hero h1 em {
-    font-style: normal; font-weight: 400; color: var(--ink-2);
-  }
+  header.hero h1 em { font-style: normal; color: var(--ink-2); font-weight: 400; }
   header.hero .lede {
-    font-size: clamp(18px, 2vw, 21px); color: var(--ink-2);
+    font-size: clamp(17px, 1.7vw, 20px); color: var(--ink-2);
     max-width: 58ch; line-height: 1.55;
-    margin-bottom: 40px;
+    margin: 0 auto 36px;
   }
-  .btns { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btns { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
     font-family: var(--font-display); font-weight: 500;
-    font-size: 15px; padding: 13px 22px; border-radius: 8px;
+    font-size: 15px; padding: 14px 24px; border-radius: 10px;
     cursor: pointer; border: 1px solid transparent;
+    text-decoration: none;
     transition: transform 160ms var(--ease-out),
                 background 200ms var(--ease-out),
                 border-color 200ms var(--ease-out),
-                color 200ms var(--ease-out);
+                filter 200ms var(--ease-out);
   }
   .btn:active { transform: scale(0.97); }
-  .btn-primary { background: var(--accent); color: var(--accent-on); }
-  .btn-primary:hover { filter: brightness(1.05); color: var(--accent-on); }
-  .btn-ghost { color: var(--ink-1); border-color: var(--border); }
-  .btn-ghost:hover { border-color: var(--ink-2); color: var(--ink-1); }
+  .btn-primary { background: var(--ink-1); color: var(--canvas); border-color: var(--ink-1); }
+  .btn-primary:hover { filter: brightness(1.06); background: var(--ink-1); color: var(--canvas); text-decoration: none; }
+  .btn-ghost { color: var(--ink-1); border-color: var(--border); background: transparent; }
+  .btn-ghost:hover { border-color: var(--ink-1); color: var(--ink-1); text-decoration: none; }
   .btn .arrow { transition: transform 180ms var(--ease-out); }
   .btn:hover .arrow { transform: translateX(3px); }
-  header.hero .fineprint {
-    margin-top: 24px; font-size: 14px; color: var(--ink-3);
+  .hero-fineprint {
+    margin-top: 20px; font-size: 13px; color: var(--ink-3);
   }
 
-  /* ---------- sections ---------- */
-  section { padding: clamp(64px, 10vw, 112px) 0; border-top: 1px solid var(--border-soft); }
-  section .label {
+  /* ---------- generic section ---------- */
+  section { padding: clamp(64px, 10vw, 104px) 0; }
+  section + section { border-top: 1px solid var(--border-soft); }
+  section .eyebrow {
+    display: inline-block;
     font-family: var(--font-mono); font-size: 12px; font-weight: 500;
-    color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 14px;
   }
   section h2 {
-    font-size: clamp(28px, 4vw, 44px); font-weight: 500;
+    font-size: clamp(28px, 4.2vw, 46px); font-weight: 500;
     line-height: 1.08; letter-spacing: -0.025em;
-    margin-top: 8px; max-width: 22ch;
+    max-width: 22ch;
   }
   section h2 em { font-style: normal; color: var(--ink-2); font-weight: 400; }
-  section p.body { color: var(--ink-2); font-size: 17px; max-width: 58ch; line-height: 1.65; }
-  section p.body + p.body { margin-top: 18px; }
+  section p.body { color: var(--ink-2); font-size: 17px; max-width: 58ch; line-height: 1.65; margin-top: 18px; }
 
-  /* ---------- features (asymmetric rhythm, not a uniform grid) ---------- */
-  .features { margin-top: 48px; display: grid; gap: 4px; }
-  .feature {
-    display: grid; grid-template-columns: 3fr 9fr;
-    gap: var(--space-6); padding: 28px 0;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  .feature:last-child { border-bottom: 0; }
-  .feature .idx {
-    font-family: var(--font-mono); font-size: 12px; color: var(--ink-3);
-    padding-top: 4px;
-  }
-  .feature h4 {
-    font-size: 19px; font-weight: 500; letter-spacing: -0.01em;
-    margin-bottom: 6px;
-  }
-  .feature p { color: var(--ink-2); font-size: 16px; line-height: 1.6; max-width: 62ch; }
-  @media (max-width: 680px) {
-    .feature { grid-template-columns: 1fr; gap: 8px; }
-    .feature .idx { padding-top: 0; }
-  }
-
-  /* ---------- compare ---------- */
-  .compare {
+  /* ---------- product shot ---------- */
+  .shot {
     margin-top: 48px;
-    display: grid; gap: var(--space-5);
-  }
-  @media (min-width: 760px) { .compare { grid-template-columns: 1fr 1fr; } }
-  .compare article {
-    padding: 28px 28px 24px;
-    border: 1px solid var(--border-soft); border-radius: 10px;
+    border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--border-soft);
+    box-shadow: var(--shadow-soft);
     background: var(--canvas-2);
   }
-  .compare article.highlight {
-    border-color: var(--accent-quiet); background: var(--surface);
+  .shot img, .shot svg {
+    display: block; width: 100%; height: auto;
   }
-  .compare h5 {
-    font-size: 13px; font-family: var(--font-mono); font-weight: 500;
-    color: var(--ink-3); margin-bottom: 4px;
-    text-transform: uppercase; letter-spacing: 0.08em;
+  .shot-caption {
+    text-align: center; color: var(--ink-3); font-size: 13px;
+    margin-top: 14px;
   }
-  .compare .title {
-    font-size: 22px; font-weight: 500; letter-spacing: -0.01em;
-    margin-bottom: 16px;
-  }
-  .compare ul { list-style: none; }
-  .compare li {
-    padding: 9px 0; color: var(--ink-2); font-size: 15px; line-height: 1.55;
-    display: grid; grid-template-columns: 16px 1fr; gap: 10px;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  .compare li:last-child { border-bottom: 0; }
-  .compare li::before {
-    content: ""; width: 16px; height: 1px; background: var(--ink-3);
-    align-self: center;
-  }
-  .compare article.highlight li::before { background: var(--accent); height: 2px; }
 
-  /* ---------- install paths ---------- */
-  .paths { margin-top: 40px; display: grid; gap: 32px; }
-  .path {
-    display: grid; grid-template-columns: auto 1fr; gap: 24px;
-    padding-top: 28px; border-top: 1px solid var(--border-soft);
+  /* ---------- SVG mockup palette helpers ---------- */
+  .mockup { display: block; width: 100%; height: auto; }
+  .mockup .mk-bg     { fill: var(--canvas); }
+  .mockup .mk-bg-2   { fill: var(--canvas-2); }
+  .mockup .mk-surf   { fill: var(--surface); }
+  .mockup .mk-border { stroke: var(--border); fill: none; }
+  .mockup .mk-soft   { stroke: var(--border-soft); fill: none; }
+  .mockup .mk-ink-1  { fill: var(--ink-1); }
+  .mockup .mk-ink-2  { fill: var(--ink-2); }
+  .mockup .mk-ink-3  { fill: var(--ink-3); }
+  .mockup .mk-accent { fill: var(--accent); }
+  .mockup .mk-accent-quiet { fill: var(--accent-quiet); }
+  .mockup .mk-accent-on { fill: var(--accent-on); }
+  .mockup text {
+    font-family: var(--font-display); fill: var(--ink-1);
+    font-weight: 500;
   }
-  .path:first-child { border-top: 0; padding-top: 0; }
-  .path .num {
-    font-family: var(--font-mono); font-size: 12px; color: var(--accent);
-    padding-top: 5px; min-width: 28px;
-  }
-  .path h4 {
-    font-size: 21px; font-weight: 500; letter-spacing: -0.015em;
-    margin-bottom: 8px;
-  }
-  .path h4 .pill {
-    margin-left: 10px; font-family: var(--font-mono); font-size: 11px;
-    color: var(--ink-3); font-weight: 500; letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 3px 8px; border: 1px solid var(--border); border-radius: 4px;
-    background: transparent; vertical-align: middle;
-  }
-  .path p { color: var(--ink-2); font-size: 16px; max-width: 62ch; }
-  .path pre { margin-top: 16px; max-width: 620px; }
-  @media (max-width: 560px) { .path { grid-template-columns: 1fr; gap: 8px; } }
+  .mockup .t-mono { font-family: var(--font-mono); }
+  .mockup .t-mute { fill: var(--ink-2); font-weight: 400; }
+  .mockup .t-dim  { fill: var(--ink-3); font-weight: 400; }
 
-  /* ---------- small helpers ---------- */
-  .prereqs { margin-top: 40px; display: grid; gap: 20px; }
-  @media (min-width: 640px) { .prereqs { grid-template-columns: repeat(3, 1fr); } }
-  .prereq h5 {
-    font-size: 15px; font-weight: 500; margin-bottom: 6px;
+  /* ---------- steps ---------- */
+  .steps { margin-top: 56px; display: grid; gap: clamp(32px, 5vw, 56px); }
+  .step {
+    display: grid; gap: 24px;
+    align-items: center;
   }
-  .prereq p {
-    color: var(--ink-2); font-size: 14px; line-height: 1.55;
+  @media (min-width: 780px) {
+    .step { grid-template-columns: 5fr 7fr; gap: 48px; }
+    .step.reverse { grid-template-columns: 7fr 5fr; }
+    .step.reverse .step-text { order: 2; }
+  }
+  .step-text .num {
+    font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+    color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .step-text h3 {
+    font-size: clamp(22px, 2.8vw, 28px); font-weight: 500;
+    line-height: 1.2; letter-spacing: -0.015em;
+    margin-bottom: 10px;
+  }
+  .step-text p { color: var(--ink-2); font-size: 16px; line-height: 1.6; max-width: 46ch; }
+  .step-img {
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border-soft);
+    box-shadow: var(--shadow-soft);
+    background: var(--canvas-2);
+  }
+  .step-img img, .step-img svg { display: block; width: 100%; height: auto; }
+
+  /* ---------- audience cards ---------- */
+  .audiences {
+    margin-top: 48px; display: grid; gap: 20px;
+  }
+  @media (min-width: 780px) { .audiences { grid-template-columns: repeat(3, 1fr); } }
+  .audience {
+    padding: 28px;
+    background: var(--canvas-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+  }
+  .audience h4 {
+    font-size: 18px; font-weight: 500; letter-spacing: -0.01em;
+    margin-bottom: 10px;
+  }
+  .audience p {
+    color: var(--ink-2); font-size: 15px; line-height: 1.55;
+  }
+
+  /* ---------- requirements row ---------- */
+  .reqs {
+    margin-top: 40px; display: grid; gap: 20px;
+  }
+  @media (min-width: 640px) { .reqs { grid-template-columns: repeat(3, 1fr); } }
+  .req {
+    padding-top: 20px;
+    border-top: 2px solid var(--ink-1);
+  }
+  .req h5 { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+  .req p { color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+
+  /* ---------- integrations matrix ---------- */
+  .integrations {
+    margin-top: 48px; display: grid; gap: 28px;
+  }
+  .int-row {
+    display: grid; gap: 14px;
+    grid-template-columns: 1fr;
+    padding: 24px 0;
+    border-top: 1px solid var(--border-soft);
+  }
+  @media (min-width: 780px) {
+    .int-row { grid-template-columns: 200px 1fr; gap: 32px; align-items: start; }
+  }
+  .int-row:last-of-type { border-bottom: 1px solid var(--border-soft); }
+  .int-head h4 { font-size: 17px; font-weight: 500; margin-bottom: 4px; }
+  .int-head p {
+    color: var(--ink-3); font-size: 13px; line-height: 1.5;
+  }
+  .int-tags { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+  .int-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px 7px 14px; border-radius: 999px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    background: var(--canvas-2);
+    color: var(--ink-1);
+  }
+  .int-tag[data-state="live"] {
+    border-color: var(--accent);
+  }
+  .int-tag[data-state="live"]::before {
+    content: ""; width: 6px; height: 6px; border-radius: 999px;
+    background: var(--accent);
+  }
+  .int-tag[data-state="byo"] {
+    color: var(--ink-2); border-style: dashed;
+  }
+  .int-tag[data-state="byo"]::before {
+    content: ""; width: 6px; height: 6px; border-radius: 999px;
+    border: 1.5px solid var(--accent); background: transparent;
+  }
+  .int-tag[data-state="soon"] {
+    color: var(--ink-3); border-style: dashed;
+  }
+  .int-tag[data-state="soon"]::before {
+    content: ""; width: 6px; height: 6px; border-radius: 999px;
+    border: 1.5px solid var(--ink-3);
+  }
+  .int-legend {
+    display: flex; flex-wrap: wrap; gap: 20px;
+    font-size: 13px; color: var(--ink-3);
+    margin-top: 6px;
+  }
+  .int-legend .dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 999px; margin-right: 6px; vertical-align: 1px;
+  }
+  .int-legend .dot.live { background: var(--accent); }
+  .int-legend .dot.byo  { border: 1.5px solid var(--accent); }
+  .int-legend .dot.soon { border: 1.5px solid var(--ink-3); }
+
+  /* ---------- download card ---------- */
+  .download-card {
+    margin-top: 40px;
+    padding: clamp(32px, 5vw, 56px);
+    background: var(--canvas-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 18px;
+    text-align: center;
+  }
+  .download-card h3 {
+    font-size: clamp(22px, 3vw, 30px); font-weight: 500;
+    letter-spacing: -0.02em; margin-bottom: 10px;
+  }
+  .download-card p.sub {
+    color: var(--ink-2); font-size: 16px; max-width: 44ch;
+    margin: 0 auto 28px;
+  }
+  .download-card .btn-primary { font-size: 16px; padding: 16px 28px; }
+  .download-card .note {
+    margin-top: 20px; color: var(--ink-3); font-size: 13px; line-height: 1.55;
+    max-width: 52ch; margin-left: auto; margin-right: auto;
+  }
+
+  /* ---------- FAQ ---------- */
+  .faq { margin-top: 40px; }
+  details {
+    border-top: 1px solid var(--border-soft);
+    padding: 20px 4px;
+  }
+  details:last-of-type { border-bottom: 1px solid var(--border-soft); }
+  summary {
+    cursor: pointer; list-style: none;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 17px; font-weight: 500; color: var(--ink-1);
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary .plus {
+    width: 20px; height: 20px; position: relative; flex: none;
+  }
+  summary .plus::before, summary .plus::after {
+    content: ""; position: absolute; inset: 9px 0 auto 0;
+    border-top: 1.5px solid var(--ink-2);
+    transition: transform 180ms var(--ease-out);
+  }
+  summary .plus::after { transform: rotate(90deg); }
+  details[open] summary .plus::after { transform: rotate(0deg); }
+  details[open] summary { color: var(--accent); }
+  details > p, details > div {
+    margin-top: 14px; color: var(--ink-2); font-size: 16px; line-height: 1.6; max-width: 62ch;
   }
 
   /* ---------- footer ---------- */
-  footer { padding: 72px 0 96px; border-top: 1px solid var(--border-soft); }
-  footer .foot {
-    display: flex; justify-content: space-between; align-items: baseline;
-    flex-wrap: wrap; gap: 16px;
+  footer {
+    padding: 56px 0 80px;
+    border-top: 1px solid var(--border-soft);
     color: var(--ink-3); font-size: 14px;
   }
-  footer .doc-links { display: flex; gap: 16px; flex-wrap: wrap; }
-  footer .doc-links a { color: var(--ink-2); border-bottom-color: transparent; }
-  footer .doc-links a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; align-items: baseline; }
+  footer a { color: var(--ink-2); text-decoration-color: transparent; }
+  footer a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
-  /* ---------- reveal animation ---------- */
-  .reveal { opacity: 0; transform: translateY(16px); }
+  /* ---------- reveal-on-scroll ---------- */
+  .reveal { opacity: 0; transform: translateY(14px); }
   .reveal.in-view {
     opacity: 1; transform: translateY(0);
     transition: opacity 500ms var(--ease-out), transform 500ms var(--ease-out);
   }
   @media (prefers-reduced-motion: reduce) {
     .reveal { opacity: 1; transform: none; }
-    .reveal.in-view { transition: none; }
-    a, .btn, .btn .arrow { transition: none; }
+    * { transition: none !important; }
   }
 </style>
 </head>
@@ -279,276 +462,879 @@
 
 <nav class="top">
   <div class="wrap">
-    <a class="brand" href="/"><span class="dot"></span>schedule-agent</a>
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/>
+          <path d="M3 9.5h18"/>
+          <rect x="6" y="12.5" width="9" height="2" rx="1" fill="currentColor"/>
+          <rect x="6" y="16.5" width="12" height="2" rx="1" fill="currentColor"/>
+        </svg>
+      </span>
+      AutoPlan
+    </a>
+    <span class="nav-spacer"></span>
     <div class="nav-links">
       <a href="#how">How it works</a>
-      <a href="#install">Install</a>
-      <a href="https://github.com/ELuria17/schedule-agent" target="_blank" rel="noopener">GitHub</a>
+      <a href="#works-with">Works with</a>
+      <a href="#faq">Questions</a>
+      <a href="#download">Download</a>
     </div>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
   </div>
 </nav>
 
 <header class="hero">
   <div class="wrap">
-    <div class="reveal">
-      <div class="eyebrow">v0.1 · MIT · bring your own API key</div>
-      <h1>A scheduler that plans your week, <em>not just your inbox.</em></h1>
-      <p class="lede">
-        Reads tasks from Canvas or your todo app, places them around your
-        classes and meetings with a deterministic solver, and pings you
-        when something's slipping. Runs on your Mac. Data stays local.
-      </p>
-      <div class="btns">
-        <a class="btn btn-primary" href="#install">Install <span class="arrow">→</span></a>
-        <a class="btn btn-ghost" href="https://github.com/ELuria17/schedule-agent" target="_blank" rel="noopener">Read the source</a>
-      </div>
-      <p class="fineprint">macOS, Linux, and Docker. Windows desktop app coming later.</p>
+    <img class="hero-logo reveal" src="assets/autoplan-logo.png" alt="AutoPlan logo">
+    <h1 class="reveal">Your week, <em>planned automatically.</em></h1>
+    <p class="lede reveal">
+      AutoPlan looks at what you have to do and when you're free, then blocks
+      real time on your calendar to get it done. No more staring at a to-do
+      list wondering what to start.
+    </p>
+    <div class="btns reveal">
+      <a class="btn btn-primary" href="#download">Download for Mac <span class="arrow">→</span></a>
+      <a class="btn btn-ghost" href="#how">See how it works</a>
     </div>
+    <p class="hero-fineprint reveal">Free to use. One-click app on Mac. Windows &amp; Linux via a quick Terminal install.</p>
   </div>
 </header>
 
-<section id="why">
-  <div class="wrap">
-    <div class="row row-label reveal">
-      <span class="label">01 · the premise</span>
-      <div>
-        <h2>Paying $34/month for scheduling <em>is wild</em> when the math is a few hundred lines of Python.</h2>
-        <p class="body">
-          Motion and Reclaim figured out something real: placing tasks around
-          your fixed time is a constraint problem, and solving it for you is
-          genuinely useful. Charging a subscription to do math on your own
-          calendar is the part that doesn't survive scrutiny.
-        </p>
-        <p class="body">
-          This is that solver, wrapped in a small hub you can open from any
-          browser on your machine. Your tasks live in SQLite on your laptop.
-          Your calendar sits on iCloud. Your API key is your business. The
-          code is MIT-licensed and boring — no startup, no telemetry, no cloud
-          component you can't see.
-        </p>
-      </div>
+<section id="what">
+  <div class="wrap-narrow">
+    <div class="reveal">
+      <span class="eyebrow">The idea</span>
+      <h2>You already know <em>what</em> you need to do. You just don't know <em>when</em>.</h2>
+      <p class="body">
+        Most to-do apps are lists. A list tells you there are ten things
+        waiting. It doesn't tell you when you'll actually do them.
+      </p>
+      <p class="body">
+        AutoPlan is different. It looks at your classes, your meetings, and
+        your sleep — the times that are already taken — and then fits your
+        homework, your reading, and your errands into the spaces in between.
+        If something won't fit before its deadline, it tells you, before
+        the deadline sneaks up.
+      </p>
     </div>
+    <div class="shot reveal">
+      <!-- Mockup of the hub. Swap for a real screenshot by replacing this
+           <svg> with <img src="assets/screenshots/hub.png" alt="..."> -->
+      <svg class="mockup" viewBox="0 0 1600 900" role="img" aria-label="AutoPlan hub overview mockup">
+        <rect class="mk-bg-2" width="1600" height="900"/>
+        <!-- window chrome -->
+        <rect class="mk-surf" x="0" y="0" width="1600" height="64"/>
+        <circle cx="26" cy="32" r="6" fill="#ff5f57"/>
+        <circle cx="50" cy="32" r="6" fill="#febc2e"/>
+        <circle cx="74" cy="32" r="6" fill="#28c840"/>
+        <rect x="650" y="20" width="300" height="24" rx="6" class="mk-bg"/>
+        <text x="800" y="37" text-anchor="middle" font-size="12" class="t-dim">127.0.0.1:8787 / hub</text>
+
+        <!-- brand row -->
+        <rect x="34" y="92" width="32" height="32" rx="7" class="mk-ink-1"/>
+        <text x="82" y="115" font-size="22" font-weight="600">AutoPlan</text>
+
+        <!-- Pending review banner -->
+        <rect x="34" y="150" width="1050" height="88" rx="12" class="mk-surf"/>
+        <rect x="34" y="150" width="4" height="88" class="mk-accent"/>
+        <text x="60" y="180" font-size="12" class="t-mono t-mute">PENDING REVIEW · 2 WAITING</text>
+        <text x="60" y="208" font-size="15">ENGL 202 — draft outline   ·   PSYCH 100 — Ch. 6 reading</text>
+        <rect x="950" y="170" width="110" height="40" rx="8" class="mk-ink-1"/>
+        <text x="1005" y="195" text-anchor="middle" font-size="13" class="mk-bg">Approve all</text>
+
+        <!-- Tasks section header -->
+        <text x="34" y="288" font-size="12" class="t-mono t-dim">TASKS · 7 ACTIVE · 1 AT RISK</text>
+
+        <!-- Tasks card -->
+        <rect x="34" y="306" width="1050" height="486" rx="14" class="mk-surf"/>
+
+        <!-- Quick-add form -->
+        <rect x="58" y="328" width="1002" height="48" rx="8" class="mk-bg"/>
+        <rect x="58" y="328" width="1002" height="48" rx="8" class="mk-soft"/>
+        <text x="78" y="358" font-size="14" class="t-dim">Add a task — title, duration, deadline…</text>
+        <rect x="995" y="340" width="56" height="24" rx="6" class="mk-ink-1"/>
+        <text x="1023" y="358" text-anchor="middle" font-size="12" class="mk-bg">Add</text>
+
+        <!-- Task 1 -->
+        <rect x="58" y="398" width="1002" height="64" rx="10" class="mk-bg"/>
+        <rect x="78" y="418" width="56" height="22" rx="11" class="mk-accent"/>
+        <text x="106" y="434" text-anchor="middle" font-size="11" class="mk-accent-on t-mono" font-weight="600">ASAP</text>
+        <text x="150" y="434" font-size="15">ECON 104 — Problem Set 8</text>
+        <text x="150" y="452" font-size="12" class="t-dim">90 min · due Fri 11:59 PM · 2 chunks placed</text>
+        <circle cx="1020" cy="430" r="16" class="mk-bg-2"/>
+        <path d="M1013 431 l5 5 l10 -10" stroke-width="2" fill="none" stroke="currentColor" class="mk-ink-2" style="color: var(--ink-2);"/>
+
+        <!-- Task 2 (at risk) -->
+        <rect x="58" y="478" width="1002" height="64" rx="10" fill="var(--accent-quiet)"/>
+        <rect x="78" y="498" width="56" height="22" rx="11" class="mk-accent"/>
+        <text x="106" y="514" text-anchor="middle" font-size="11" class="mk-accent-on t-mono" font-weight="600">HIGH</text>
+        <rect x="144" y="498" width="72" height="22" rx="11" class="mk-accent"/>
+        <text x="180" y="514" text-anchor="middle" font-size="11" class="mk-accent-on t-mono" font-weight="600">AT RISK</text>
+        <text x="232" y="514" font-size="15">MGMT 301 — group paper draft</text>
+        <text x="232" y="532" font-size="12" class="t-dim">needs 180 min · only 90 min free before Thu 5 PM</text>
+
+        <!-- Task 3 -->
+        <rect x="58" y="558" width="1002" height="64" rx="10" class="mk-bg"/>
+        <rect x="78" y="578" width="68" height="22" rx="11" class="mk-surf"/>
+        <text x="112" y="594" text-anchor="middle" font-size="11" class="t-mono t-mute" font-weight="600">MEDIUM</text>
+        <text x="162" y="594" font-size="15">IST 130 — lab writeup</text>
+        <text x="162" y="612" font-size="12" class="t-dim">60 min · due next Mon · 1 chunk placed</text>
+
+        <!-- Task 4 -->
+        <rect x="58" y="638" width="1002" height="64" rx="10" class="mk-bg"/>
+        <rect x="78" y="658" width="56" height="22" rx="11" class="mk-surf"/>
+        <text x="106" y="674" text-anchor="middle" font-size="11" class="t-mono t-mute" font-weight="600">LOW</text>
+        <text x="150" y="674" font-size="15">Read Atomic Habits, Ch. 4</text>
+        <text x="150" y="692" font-size="12" class="t-dim">30 min · no deadline · placed Sat AM</text>
+
+        <!-- Task 5 -->
+        <rect x="58" y="718" width="1002" height="54" rx="10" class="mk-bg"/>
+        <text x="78" y="750" font-size="14" class="t-mute">+ 3 more</text>
+
+        <!-- Right rail: solver activity -->
+        <text x="1116" y="288" font-size="12" class="t-mono t-dim">SOLVER ACTIVITY</text>
+        <rect x="1116" y="306" width="450" height="486" rx="14" class="mk-surf"/>
+
+        <!-- activity entry -->
+        <text x="1138" y="340" font-size="12" class="t-mono t-dim">9:12 AM · task_mutation</text>
+        <text x="1138" y="360" font-size="14">placed 7 chunks · 1 at risk</text>
+        <rect x="1138" y="376" width="406" height="1" class="mk-soft" fill="var(--border-soft)"/>
+
+        <text x="1138" y="410" font-size="12" class="t-mono t-dim">9:00 AM · morning</text>
+        <text x="1138" y="430" font-size="14">daily summary sent</text>
+        <rect x="1138" y="446" width="406" height="1" class="mk-soft" fill="var(--border-soft)"/>
+
+        <text x="1138" y="480" font-size="12" class="t-mono t-dim">8:47 AM · poll</text>
+        <text x="1138" y="500" font-size="14">canvas +1 new assignment</text>
+        <rect x="1138" y="516" width="406" height="1" class="mk-soft" fill="var(--border-soft)"/>
+
+        <text x="1138" y="550" font-size="12" class="t-mono t-dim">8:32 AM · task_mutation</text>
+        <text x="1138" y="570" font-size="14">placed 6 chunks · 0 at risk</text>
+        <rect x="1138" y="586" width="406" height="1" class="mk-soft" fill="var(--border-soft)"/>
+
+        <text x="1138" y="620" font-size="12" class="t-mono t-dim">Yesterday 11:14 PM</text>
+        <text x="1138" y="640" font-size="14">canvas ✓3 marked done</text>
+
+        <text x="1138" y="775" font-size="12" class="t-dim">View all activity →</text>
+      </svg>
+    </div>
+    <p class="shot-caption">Everything you've got going on, planned out on one page.</p>
   </div>
 </section>
 
 <section id="how">
   <div class="wrap">
-    <div class="row row-label">
-      <span class="label reveal">02 · what it does</span>
-      <div class="reveal">
-        <h2>Six things, each honest about its job.</h2>
-      </div>
+    <div class="reveal" style="text-align:center; margin-bottom: 20px;">
+      <span class="eyebrow">How it works</span>
+      <h2 style="margin-left:auto; margin-right:auto;">Four steps. <em>That's it.</em></h2>
     </div>
 
-    <div class="features">
-      <div class="feature reveal">
-        <span class="idx">01</span>
-        <div>
-          <h4>Deterministic solver</h4>
-          <p>Greedy placement with chunk splitting, deadline pressure, priority tiers, and an overdue-tolerant fallback. Math, not vibes. Never schedules during class.</p>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-text">
+          <div class="num">Step 1</div>
+          <h3>Tell AutoPlan about your life.</h3>
+          <p>
+            Connect your calendar (Apple Calendar today, Google Calendar
+            and Outlook next) and, if you're a student, your
+            <strong>Canvas</strong> or (soon) <strong>Google Classroom</strong>
+            account. Setup takes about three minutes.
+          </p>
+        </div>
+        <div class="step-img">
+          <!-- Setup wizard mockup -->
+          <svg class="mockup" viewBox="0 0 1200 900" role="img" aria-label="AutoPlan setup wizard mockup">
+            <rect class="mk-bg" width="1200" height="900"/>
+            <!-- window chrome -->
+            <rect class="mk-surf" x="0" y="0" width="1200" height="50"/>
+            <circle cx="22" cy="25" r="5" fill="#ff5f57"/>
+            <circle cx="42" cy="25" r="5" fill="#febc2e"/>
+            <circle cx="62" cy="25" r="5" fill="#28c840"/>
+            <!-- brand -->
+            <circle cx="140" cy="100" r="5" class="mk-accent"/>
+            <text x="154" y="105" font-size="14" class="t-mute">AutoPlan</text>
+            <!-- heading -->
+            <text x="140" y="175" font-size="38" font-weight="500" letter-spacing="-1">Let's get you set up.</text>
+            <text x="140" y="215" font-size="16" class="t-mute">One pass through this form. You can change it anytime.</text>
+
+            <!-- section: Core -->
+            <text x="140" y="288" font-size="12" class="t-mono t-dim">CORE</text>
+            <rect x="140" y="300" width="920" height="1" class="mk-soft" fill="var(--border-soft)"/>
+
+            <text x="140" y="335" font-size="14">Anthropic API key</text>
+            <text x="280" y="335" font-size="13" class="t-dim">get one at console.anthropic.com/settings/keys</text>
+            <rect x="140" y="348" width="920" height="42" rx="6" class="mk-bg-2"/>
+            <rect x="140" y="348" width="920" height="42" rx="6" class="mk-soft"/>
+            <text x="160" y="374" font-size="14" class="t-mono t-dim">••••••••••••••••••••••••••••••••••••••••••••••••••</text>
+
+            <text x="140" y="420" font-size="14">Timezone</text>
+            <rect x="140" y="432" width="920" height="42" rx="6" class="mk-bg-2"/>
+            <rect x="140" y="432" width="920" height="42" rx="6" class="mk-soft"/>
+            <text x="160" y="458" font-size="14">America/New_York</text>
+
+            <!-- section: Calendar -->
+            <text x="140" y="525" font-size="12" class="t-mono t-dim">CALENDAR</text>
+            <rect x="140" y="537" width="920" height="1" fill="var(--border-soft)"/>
+
+            <!-- radio: iCloud selected -->
+            <circle cx="155" cy="575" r="9" fill="none" stroke="var(--accent)" stroke-width="2"/>
+            <circle cx="155" cy="575" r="4" class="mk-accent"/>
+            <text x="174" y="580" font-size="15">iCloud</text>
+            <circle cx="260" cy="575" r="9" fill="none" stroke="var(--border)" stroke-width="1.5"/>
+            <text x="279" y="580" font-size="15" class="t-mute">Skip for now</text>
+
+            <text x="140" y="625" font-size="14">Apple ID email</text>
+            <rect x="140" y="637" width="920" height="42" rx="6" class="mk-bg-2"/>
+            <rect x="140" y="637" width="920" height="42" rx="6" class="mk-soft"/>
+            <text x="160" y="663" font-size="14">you@example.com</text>
+
+            <!-- submit -->
+            <rect x="140" y="755" width="920" height="54" rx="10" class="mk-ink-1"/>
+            <text x="600" y="789" text-anchor="middle" font-size="16" font-weight="500" class="mk-bg">Save and create Anthropic agent</text>
+          </svg>
         </div>
       </div>
-      <div class="feature reveal">
-        <span class="idx">02</span>
-        <div>
-          <h4>Pluggable providers</h4>
-          <p>Canvas LMS, iCloud CalDAV, Apple Reminders, iMessage, ntfy.sh shipped. Each is one Python class against a small ABC. Adding Google Calendar or Todoist is a file, not a rewrite.</p>
+
+      <div class="step reverse reveal">
+        <div class="step-text">
+          <div class="num">Step 2</div>
+          <h3>Your to-dos show up on their own.</h3>
+          <p>
+            AutoPlan pulls tasks in from your <strong>Canvas</strong>
+            account (students) and your <strong>Todoist</strong> inbox
+            (professionals). Google Classroom, Google Tasks, and
+            Microsoft To Do are next. You can also just type a task in
+            the hub: <em>"Read chapter 4, about 40 minutes, due Friday."</em>
+          </p>
+        </div>
+        <div class="step-img">
+          <!-- Task list mockup -->
+          <svg class="mockup" viewBox="0 0 1200 900" role="img" aria-label="AutoPlan task list mockup">
+            <rect class="mk-bg-2" width="1200" height="900"/>
+            <!-- header -->
+            <text x="40" y="60" font-size="13" class="t-mono t-dim">TASKS · 5 ACTIVE</text>
+            <rect x="40" y="72" width="1120" height="1" fill="var(--border-soft)"/>
+
+            <!-- quick-add row -->
+            <rect x="40" y="92" width="850" height="54" rx="10" class="mk-bg"/>
+            <rect x="40" y="92" width="850" height="54" rx="10" class="mk-soft"/>
+            <text x="64" y="127" font-size="15" class="t-dim">Add a task…</text>
+
+            <rect x="905" y="92" width="110" height="54" rx="10" class="mk-bg"/>
+            <rect x="905" y="92" width="110" height="54" rx="10" class="mk-soft"/>
+            <text x="960" y="126" text-anchor="middle" font-size="13" class="t-mute">60 min</text>
+
+            <rect x="1030" y="92" width="130" height="54" rx="10" class="mk-ink-1"/>
+            <text x="1095" y="126" text-anchor="middle" font-size="15" class="mk-bg" font-weight="500">+ Add task</text>
+
+            <!-- task 1 -->
+            <rect x="40" y="180" width="1120" height="82" rx="12" class="mk-bg"/>
+            <rect x="64" y="206" width="62" height="26" rx="13" class="mk-accent"/>
+            <text x="95" y="224" text-anchor="middle" font-size="12" class="mk-accent-on t-mono" font-weight="600">ASAP</text>
+            <text x="142" y="224" font-size="17" font-weight="500">Finish ECON problem set 8</text>
+            <text x="142" y="245" font-size="13" class="t-mute">ECON 104 · 90 min · due tomorrow 11:59 PM</text>
+            <circle cx="1100" cy="221" r="18" class="mk-bg-2"/>
+            <path d="M1091 221 l6 7 l12 -13" stroke-width="2" fill="none" stroke="currentColor" style="color: var(--ink-2)"/>
+
+            <!-- task 2 -->
+            <rect x="40" y="282" width="1120" height="82" rx="12" class="mk-bg"/>
+            <rect x="64" y="308" width="62" height="26" rx="13" class="mk-accent"/>
+            <text x="95" y="326" text-anchor="middle" font-size="12" class="mk-accent-on t-mono" font-weight="600">HIGH</text>
+            <text x="142" y="326" font-size="17" font-weight="500">Draft MGMT group paper intro</text>
+            <text x="142" y="347" font-size="13" class="t-mute">MGMT 301 · 120 min · due Thu 5 PM</text>
+
+            <!-- task 3 -->
+            <rect x="40" y="384" width="1120" height="82" rx="12" class="mk-bg"/>
+            <rect x="64" y="410" width="74" height="26" rx="13" class="mk-surf"/>
+            <text x="101" y="428" text-anchor="middle" font-size="12" class="t-mono t-mute" font-weight="600">MEDIUM</text>
+            <text x="154" y="428" font-size="17" font-weight="500">Read PSYCH 100, Chapter 6</text>
+            <text x="154" y="449" font-size="13" class="t-mute">PSYCH 100 · 40 min · due Fri</text>
+
+            <!-- task 4 -->
+            <rect x="40" y="486" width="1120" height="82" rx="12" class="mk-bg"/>
+            <rect x="64" y="512" width="74" height="26" rx="13" class="mk-surf"/>
+            <text x="101" y="530" text-anchor="middle" font-size="12" class="t-mono t-mute" font-weight="600">MEDIUM</text>
+            <text x="154" y="530" font-size="17" font-weight="500">IST lab writeup</text>
+            <text x="154" y="551" font-size="13" class="t-mute">IST 130 · 60 min · due Mon</text>
+
+            <!-- task 5 -->
+            <rect x="40" y="588" width="1120" height="82" rx="12" class="mk-bg"/>
+            <rect x="64" y="614" width="62" height="26" rx="13" class="mk-surf"/>
+            <text x="95" y="632" text-anchor="middle" font-size="12" class="t-mono t-mute" font-weight="600">LOW</text>
+            <text x="142" y="632" font-size="17" font-weight="500">Read one chapter of Atomic Habits</text>
+            <text x="142" y="653" font-size="13" class="t-mute">30 min · no deadline</text>
+
+            <text x="40" y="740" font-size="13" class="t-dim">Completed this week: 11 tasks · 14h 20m</text>
+          </svg>
         </div>
       </div>
-      <div class="feature reveal">
-        <span class="idx">03</span>
-        <div>
-          <h4>Review gate, optional</h4>
-          <p>Turn on <code>require_approval</code> per source and new tasks land in a pending queue before they hit your calendar. Good for noisy LMS or when you're letting the agent draft tasks from incoming messages.</p>
+
+      <div class="step reveal">
+        <div class="step-text">
+          <div class="num">Step 3</div>
+          <h3>It blocks your calendar around what's already there.</h3>
+          <p>
+            AutoPlan treats your classes and meetings as untouchable. It
+            only fills in <strong>free time</strong> with your work,
+            splitting bigger tasks into focused chunks that fit. Nothing
+            ever overlaps what's already on your calendar.
+          </p>
+        </div>
+        <div class="step-img">
+          <!-- Apple Calendar week view mockup -->
+          <svg class="mockup" viewBox="0 0 1200 900" role="img" aria-label="Apple Calendar week view with AutoPlan study blocks">
+            <rect class="mk-bg" width="1200" height="900"/>
+            <!-- top bar -->
+            <rect class="mk-surf" x="0" y="0" width="1200" height="60"/>
+            <text x="30" y="38" font-size="16" font-weight="600">April 2026</text>
+            <rect x="1050" y="18" width="120" height="28" rx="6" class="mk-bg"/>
+            <text x="1110" y="37" text-anchor="middle" font-size="12" class="t-mute">Week ▾</text>
+
+            <!-- day headers -->
+            <g font-size="11" class="t-mono t-dim">
+              <text x="160" y="92" text-anchor="middle">MON 20</text>
+              <text x="310" y="92" text-anchor="middle">TUE 21</text>
+              <text x="460" y="92" text-anchor="middle">WED 22</text>
+              <text x="610" y="92" text-anchor="middle">THU 23</text>
+              <text x="760" y="92" text-anchor="middle">FRI 24</text>
+              <text x="910" y="92" text-anchor="middle">SAT 25</text>
+              <text x="1060" y="92" text-anchor="middle">SUN 26</text>
+            </g>
+
+            <!-- time rail -->
+            <g font-size="10" class="t-dim">
+              <text x="70" y="145" text-anchor="end">9 AM</text>
+              <text x="70" y="225" text-anchor="end">11 AM</text>
+              <text x="70" y="305" text-anchor="end">1 PM</text>
+              <text x="70" y="385" text-anchor="end">3 PM</text>
+              <text x="70" y="465" text-anchor="end">5 PM</text>
+              <text x="70" y="545" text-anchor="end">7 PM</text>
+              <text x="70" y="625" text-anchor="end">9 PM</text>
+            </g>
+
+            <!-- vertical day separators + horizontal hour lines -->
+            <g stroke="var(--border-soft)" stroke-width="1">
+              <line x1="85"  y1="100" x2="85"  y2="680"/>
+              <line x1="235" y1="100" x2="235" y2="680"/>
+              <line x1="385" y1="100" x2="385" y2="680"/>
+              <line x1="535" y1="100" x2="535" y2="680"/>
+              <line x1="685" y1="100" x2="685" y2="680"/>
+              <line x1="835" y1="100" x2="835" y2="680"/>
+              <line x1="985" y1="100" x2="985" y2="680"/>
+              <line x1="1135" y1="100" x2="1135" y2="680"/>
+              <line x1="85" y1="140" x2="1135" y2="140"/>
+              <line x1="85" y1="220" x2="1135" y2="220"/>
+              <line x1="85" y1="300" x2="1135" y2="300"/>
+              <line x1="85" y1="380" x2="1135" y2="380"/>
+              <line x1="85" y1="460" x2="1135" y2="460"/>
+              <line x1="85" y1="540" x2="1135" y2="540"/>
+              <line x1="85" y1="620" x2="1135" y2="620"/>
+            </g>
+
+            <!-- CLASS blocks (user-placed, dark/neutral) -->
+            <!-- Mon 9:05-9:55 MGMT -->
+            <rect x="90"  y="142" width="140" height="36" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="100" y="158" font-size="11" class="mk-bg" font-weight="600">MGMT 301</text>
+            <text x="100" y="172" font-size="10" class="mk-bg" opacity="0.8">9:05–9:55</text>
+            <!-- Mon 10:10-11 ECON -->
+            <rect x="90" y="184" width="140" height="36" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="100" y="200" font-size="11" class="mk-bg" font-weight="600">ECON 104</text>
+            <text x="100" y="214" font-size="10" class="mk-bg" opacity="0.8">10:10–11:00</text>
+            <!-- Wed same -->
+            <rect x="390" y="142" width="140" height="36" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="400" y="158" font-size="11" class="mk-bg" font-weight="600">MGMT 301</text>
+            <rect x="390" y="184" width="140" height="36" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="400" y="200" font-size="11" class="mk-bg" font-weight="600">ECON 104</text>
+            <!-- Fri MGMT -->
+            <rect x="690" y="142" width="140" height="36" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="700" y="158" font-size="11" class="mk-bg" font-weight="600">MGMT 301</text>
+            <rect x="690" y="184" width="140" height="36" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="700" y="200" font-size="11" class="mk-bg" font-weight="600">ECON 104</text>
+            <!-- Tue/Thu IST + MKTG -->
+            <rect x="240" y="195" width="140" height="50" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="250" y="211" font-size="11" class="mk-bg" font-weight="600">IST 130</text>
+            <text x="250" y="225" font-size="10" class="mk-bg" opacity="0.8">10:35–11:50</text>
+            <rect x="540" y="195" width="140" height="50" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="550" y="211" font-size="11" class="mk-bg" font-weight="600">IST 130</text>
+            <rect x="240" y="315" width="140" height="50" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="250" y="331" font-size="11" class="mk-bg" font-weight="600">MKTG 301</text>
+            <text x="250" y="345" font-size="10" class="mk-bg" opacity="0.8">1:35–2:50</text>
+            <rect x="540" y="315" width="140" height="50" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="550" y="331" font-size="11" class="mk-bg" font-weight="600">MKTG 301</text>
+            <!-- Fri ACCTG lab -->
+            <rect x="690" y="230" width="140" height="36" rx="4" class="mk-ink-1" opacity="0.85"/>
+            <text x="700" y="246" font-size="11" class="mk-bg" font-weight="600">ACCTG lab</text>
+
+            <!-- STUDY BLOCKS (AutoPlan, amber) -->
+            <rect x="90"  y="240" width="140" height="54" rx="4" class="mk-accent"/>
+            <text x="100" y="258" font-size="11" class="mk-accent-on" font-weight="600">ECON PS 8</text>
+            <text x="100" y="272" font-size="10" class="mk-accent-on" opacity="0.8">11:15–12:10</text>
+            <text x="100" y="286" font-size="10" class="mk-accent-on" opacity="0.8">AutoPlan</text>
+
+            <rect x="240" y="255" width="140" height="54" rx="4" class="mk-accent"/>
+            <text x="250" y="273" font-size="11" class="mk-accent-on" font-weight="600">MGMT paper</text>
+            <text x="250" y="287" font-size="10" class="mk-accent-on" opacity="0.8">12:00–12:55</text>
+
+            <rect x="690" y="275" width="140" height="44" rx="4" class="mk-accent"/>
+            <text x="700" y="293" font-size="11" class="mk-accent-on" font-weight="600">PSYCH reading</text>
+            <text x="700" y="307" font-size="10" class="mk-accent-on" opacity="0.8">12:10–1:00</text>
+
+            <rect x="390" y="405" width="140" height="54" rx="4" class="mk-accent"/>
+            <text x="400" y="423" font-size="11" class="mk-accent-on" font-weight="600">IST writeup</text>
+            <text x="400" y="437" font-size="10" class="mk-accent-on" opacity="0.8">3:30–4:30</text>
+
+            <rect x="90"  y="485" width="140" height="44" rx="4" class="mk-accent"/>
+            <text x="100" y="503" font-size="11" class="mk-accent-on" font-weight="600">Atomic Habits</text>
+            <text x="100" y="517" font-size="10" class="mk-accent-on" opacity="0.8">6:00–6:30</text>
+
+            <rect x="540" y="480" width="140" height="54" rx="4" class="mk-accent"/>
+            <text x="550" y="498" font-size="11" class="mk-accent-on" font-weight="600">MGMT paper</text>
+            <text x="550" y="512" font-size="10" class="mk-accent-on" opacity="0.8">5:45–6:45</text>
+
+            <rect x="840" y="180" width="140" height="64" rx="4" class="mk-accent"/>
+            <text x="850" y="198" font-size="11" class="mk-accent-on" font-weight="600">ECON PS 8</text>
+            <text x="850" y="212" font-size="10" class="mk-accent-on" opacity="0.8">10:00–11:00</text>
+            <text x="850" y="226" font-size="10" class="mk-accent-on" opacity="0.8">AutoPlan</text>
+
+            <!-- legend -->
+            <rect x="30" y="730" width="1140" height="1" fill="var(--border-soft)"/>
+            <rect x="30" y="752" width="16" height="12" rx="2" class="mk-ink-1"/>
+            <text x="54" y="763" font-size="13" class="t-mute">Your classes &amp; events</text>
+            <rect x="230" y="752" width="16" height="12" rx="2" class="mk-accent"/>
+            <text x="254" y="763" font-size="13" class="t-mute">AutoPlan study blocks</text>
+            <text x="30" y="805" font-size="13" class="t-dim">AutoPlan never touches events you placed. It only fills the gaps.</text>
+          </svg>
         </div>
       </div>
-      <div class="feature reveal">
-        <span class="idx">04</span>
-        <div>
-          <h4>Anthropic agent, also optional</h4>
-          <p>Tell it "ENGL essay due Friday, ~90 minutes" and it files the task. The LLM handles intake and daily summaries; the deterministic solver handles placement. You can run the hub without the agent if you want.</p>
+
+      <div class="step reverse reveal">
+        <div class="step-text">
+          <div class="num">Step 4</div>
+          <h3>It tells you when something's slipping.</h3>
+          <p>
+            Every morning AutoPlan sends you a short message about what's
+            on today and what's at risk of not getting done before its due
+            date. You don't have to keep track of anything yourself.
+          </p>
         </div>
-      </div>
-      <div class="feature reveal">
-        <span class="idx">05</span>
-        <div>
-          <h4>SQLite, all of it</h4>
-          <p>Task history, solver log, agent session transcripts — all persist. Restart the process, redeploy the container, reinstall the app: your history survives. No managed service anywhere.</p>
-        </div>
-      </div>
-      <div class="feature reveal">
-        <span class="idx">06</span>
-        <div>
-          <h4>A hub, not a dashboard</h4>
-          <p>One page. Tasks, solver activity, live agent streams, approve/reject, manual add. Single file of vanilla JS, no build step. Open <code>localhost:8787</code>, bookmark it, close the terminal.</p>
+        <div class="step-img">
+          <!-- iPhone morning message mockup -->
+          <svg class="mockup" viewBox="0 0 1200 900" role="img" aria-label="iPhone morning message from AutoPlan">
+            <rect class="mk-bg-2" width="1200" height="900"/>
+
+            <!-- phone frame -->
+            <rect x="375" y="60" width="450" height="820" rx="56" class="mk-ink-1"/>
+            <rect x="385" y="70" width="430" height="800" rx="48" class="mk-bg"/>
+
+            <!-- dynamic island -->
+            <rect x="530" y="82" width="140" height="28" rx="14" class="mk-ink-1"/>
+
+            <!-- status bar -->
+            <text x="420" y="104" font-size="14" font-weight="600">8:03</text>
+            <g fill="var(--ink-1)">
+              <rect x="720" y="96" width="3" height="10" rx="1"/>
+              <rect x="727" y="92" width="3" height="14" rx="1"/>
+              <rect x="734" y="88" width="3" height="18" rx="1"/>
+              <rect x="750" y="90" width="18" height="14" rx="4"/>
+            </g>
+
+            <!-- header -->
+            <rect x="385" y="130" width="430" height="58" fill="var(--canvas-2)"/>
+            <circle cx="440" cy="159" r="22" class="mk-accent-quiet"/>
+            <circle cx="440" cy="159" r="22" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+            <rect x="432" y="151" width="16" height="16" rx="3" class="mk-accent"/>
+            <text x="475" y="154" font-size="14" font-weight="600">AutoPlan</text>
+            <text x="475" y="172" font-size="11" class="t-dim">Morning summary</text>
+
+            <!-- timestamp -->
+            <text x="600" y="220" font-size="11" text-anchor="middle" class="t-dim">Today 8:03 AM</text>
+
+            <!-- message bubble 1 -->
+            <rect x="415" y="240" width="320" height="128" rx="20" class="mk-surf"/>
+            <text x="432" y="267" font-size="14" font-weight="500">☀ Tuesday plan</text>
+            <text x="432" y="290" font-size="13" class="t-mute">2pm — ECON PS 8 (60m)</text>
+            <text x="432" y="312" font-size="13" class="t-mute">4pm — PSYCH Ch.6 reading (40m)</text>
+            <text x="432" y="334" font-size="13" class="t-mute">6pm — MGMT paper draft (60m)</text>
+            <text x="432" y="356" font-size="13" class="t-mute">9:30pm — Atomic Habits (30m)</text>
+
+            <!-- message bubble 2 (at risk, highlighted) -->
+            <rect x="415" y="388" width="355" height="112" rx="20" fill="var(--accent-quiet)"/>
+            <rect x="415" y="388" width="355" height="112" rx="20" fill="none" stroke="var(--accent)" stroke-width="1"/>
+            <text x="432" y="414" font-size="14" font-weight="500">⚠ At risk</text>
+            <text x="432" y="438" font-size="13" class="t-mute">MGMT group paper draft</text>
+            <text x="432" y="458" font-size="13" class="t-mute">Needs 180m, only 90m free before</text>
+            <text x="432" y="478" font-size="13" class="t-mute">Thu 5 PM deadline.</text>
+
+            <!-- message bubble 3 -->
+            <rect x="415" y="520" width="280" height="56" rx="20" class="mk-surf"/>
+            <text x="432" y="546" font-size="13" class="t-mute">You're clear tonight after 8pm.</text>
+            <text x="432" y="564" font-size="13" class="t-mute">Nice.</text>
+
+            <!-- home indicator -->
+            <rect x="540" y="840" width="120" height="5" rx="2.5" class="mk-ink-2"/>
+          </svg>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<section id="compare">
+<section id="who">
   <div class="wrap">
-    <div class="row row-label">
-      <span class="label reveal">03 · how it compares</span>
-      <div class="reveal">
-        <h2>Two different trades. <em>Both valid.</em></h2>
-        <p class="body" style="margin-top:18px">
-          Motion-style tools are paying for themselves by running your
-          scheduling in their cloud. That's a real service, and there's
-          nothing wrong with paying for it. But it's worth being explicit
-          about what you're trading for.
-        </p>
-      </div>
+    <div class="reveal">
+      <span class="eyebrow">Who it's for</span>
+      <h2>Anyone whose calendar fills up <em>before</em> their work does.</h2>
     </div>
 
-    <div class="compare">
-      <article class="highlight reveal">
-        <h5>This</h5>
-        <div class="title">schedule-agent</div>
-        <ul>
-          <li>$0/mo infra, ~$5/mo in API tokens</li>
-          <li>All data local, on your own machine</li>
-          <li>iCloud + Canvas + iMessage out of the box</li>
-          <li>Open source, MIT, audit-friendly</li>
-          <li>New integration = one file</li>
-          <li>You run your own Mac, Linux host, or container</li>
-        </ul>
-      </article>
-      <article class="reveal">
-        <h5>The alternative</h5>
-        <div class="title">Motion, Reclaim, TimeHero</div>
-        <ul>
-          <li>$19 – $34/month</li>
-          <li>Tasks and calendar copies live in the vendor's cloud</li>
-          <li>Opinionated integrations; no LMS support</li>
-          <li>Closed source</li>
-          <li>New integration happens on their roadmap</li>
-          <li>Zero hosting on your side</li>
-        </ul>
-      </article>
+    <div class="audiences">
+      <div class="audience reveal">
+        <h4>Students</h4>
+        <p>
+          Classes are fixed. Assignments aren't. AutoPlan pulls your
+          <strong>Canvas</strong> work in automatically (and
+          <strong>Google Classroom</strong> support is next), spreads it
+          across the evenings you actually have free, and warns you before
+          a paper eats your weekend.
+        </p>
+      </div>
+      <div class="audience reveal">
+        <h4>Busy professionals</h4>
+        <p>
+          Meetings are scheduled; the actual work isn't. AutoPlan holds
+          real time on your calendar for the things that matter, and
+          pulls tasks straight from your <strong>Todoist</strong> (live
+          today) so you're not re-typing what someone already asked you
+          to do. Google Tasks, Microsoft To Do, and email scanning are
+          on the way.
+        </p>
+      </div>
+      <div class="audience reveal">
+        <h4>Anyone with a long list</h4>
+        <p>
+          If a task isn't on your calendar, it doesn't get done. AutoPlan
+          does the calendar part for you, so the list stops feeling
+          impossible.
+        </p>
+      </div>
     </div>
   </div>
 </section>
 
-<section id="install">
+<section id="works-with">
   <div class="wrap">
-    <div class="row row-label">
-      <span class="label reveal">04 · install</span>
-      <div class="reveal">
-        <h2>Three ways in. <em>Same app.</em></h2>
-        <p class="body" style="margin-top:18px">
-          Pick based on how deep you want to go. The wizard is the same in
-          all three — it writes a <code>.env</code>, creates your Anthropic
-          agent, and drops you at the hub.
+    <div class="reveal">
+      <span class="eyebrow">Works with</span>
+      <h2>Plays nicely with what you <em>already use.</em></h2>
+      <p class="body" style="margin-top:14px;">
+        AutoPlan is a polite guest in your stack. Every connector below
+        is real code that runs today. Pick what you want, ignore the
+        rest.
+      </p>
+      <div class="int-legend">
+        <span><span class="dot live"></span>Plug and play — paste a token, done.</span>
+        <span><span class="dot byo"></span>Works today, needs a 10-min Google Cloud or Azure setup.</span>
+        <span><span class="dot soon"></span>Scaffolded, not yet shipped.</span>
+      </div>
+    </div>
+
+    <div class="integrations">
+      <div class="int-row reveal">
+        <div class="int-head">
+          <h4>Where your tasks come from</h4>
+          <p>LMS, to-do app, or your own typing — whatever's easiest.</p>
+        </div>
+        <div class="int-tags">
+          <span class="int-tag" data-state="live">Canvas LMS</span>
+          <span class="int-tag" data-state="live">Todoist</span>
+          <span class="int-tag" data-state="live">Type directly in the hub</span>
+          <span class="int-tag" data-state="live">Tell the AI in plain English</span>
+          <span class="int-tag" data-state="byo">Google Classroom</span>
+          <span class="int-tag" data-state="byo">Google Tasks</span>
+          <span class="int-tag" data-state="byo">Microsoft To Do</span>
+          <span class="int-tag" data-state="soon">Gmail / Outlook email scanning</span>
+        </div>
+      </div>
+
+      <div class="int-row reveal">
+        <div class="int-head">
+          <h4>Where it writes your schedule</h4>
+          <p>The calendar AutoPlan blocks time on. Your existing events stay untouched.</p>
+        </div>
+        <div class="int-tags">
+          <span class="int-tag" data-state="live">Apple Calendar / iCloud</span>
+          <span class="int-tag" data-state="live">Fastmail</span>
+          <span class="int-tag" data-state="live">Posteo</span>
+          <span class="int-tag" data-state="live">Nextcloud / Radicale</span>
+          <span class="int-tag" data-state="live">Any CalDAV server</span>
+          <span class="int-tag" data-state="byo">Google Calendar</span>
+          <span class="int-tag" data-state="byo">Microsoft Outlook</span>
+        </div>
+      </div>
+
+      <div class="int-row reveal">
+        <div class="int-head">
+          <h4>How AutoPlan pings you</h4>
+          <p>Daily summary and at-risk alerts.</p>
+        </div>
+        <div class="int-tags">
+          <span class="int-tag" data-state="live">iMessage (macOS)</span>
+          <span class="int-tag" data-state="live">ntfy.sh push</span>
+          <span class="int-tag" data-state="live">Pushover</span>
+          <span class="int-tag" data-state="live">Email (any SMTP)</span>
+          <span class="int-tag" data-state="live">Slack DM</span>
+        </div>
+      </div>
+
+      <div class="int-row reveal">
+        <div class="int-head">
+          <h4>Auto-close completed tasks</h4>
+          <p>Check something off in your to-do app and AutoPlan marks the matching task done.</p>
+        </div>
+        <div class="int-tags">
+          <span class="int-tag" data-state="live">Apple Reminders (macOS)</span>
+          <span class="int-tag" data-state="byo">Google Tasks</span>
+          <span class="int-tag" data-state="byo">Microsoft To Do</span>
+          <span class="int-tag" data-state="soon">Todoist completions sync</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="need">
+  <div class="wrap-narrow">
+    <div class="reveal">
+      <span class="eyebrow">Before you start</span>
+      <h2>Three things you'll need.</h2>
+    </div>
+
+    <div class="reqs">
+      <div class="req reveal">
+        <h5>A computer</h5>
+        <p>Mac is a double-click app. Windows and Linux work today if you're comfortable with a 15-minute Terminal setup — walkthrough linked below.</p>
+      </div>
+      <div class="req reveal">
+        <h5>A calendar AutoPlan can write to</h5>
+        <p>Apple Calendar (built into every Mac, syncs with iCloud) is the supported option today. Google Calendar and Outlook are next — in the meantime, events synced <em>into</em> Apple Calendar from either work fine.</p>
+      </div>
+      <div class="req reveal">
+        <h5>About $5 a month</h5>
+        <p>
+          AutoPlan uses Claude (from Anthropic) for the friendly message
+          part. Sign up free, add a few dollars of credit — typical usage
+          runs under $5/month. You can also run AutoPlan without the AI
+          layer entirely, for free.
         </p>
       </div>
     </div>
+  </div>
+</section>
 
-    <div class="paths">
-      <div class="path reveal">
-        <span class="num">01</span>
-        <div>
-          <h4>Terminal, one command <span class="pill">fastest</span></h4>
-          <p>
-            Clone, make a venv, run the wizard in your browser. No
-            packaging, no Gatekeeper warnings. This is how I run it.
-          </p>
-<pre><code>git clone https://github.com/ELuria17/schedule-agent
-cd schedule-agent-public
-python3 -m venv venv &amp;&amp; source venv/bin/activate
-pip install -r requirements.txt
-python run.py</code></pre>
-        </div>
-      </div>
-
-      <div class="path reveal">
-        <span class="num">02</span>
-        <div>
-          <h4>Docker <span class="pill">headless</span></h4>
-          <p>
-            Self-contained image. Mount <code>.env</code> and
-            <code>state.db</code> as volumes. Good for VPS or a home server.
-          </p>
-<pre><code>docker compose up -d --build</code></pre>
-          <p style="margin-top:16px">
-            See <a href="https://github.com/ELuria17/schedule-agent/blob/main/docs/deployment.md">docs/deployment.md</a>
-            for the systemd-on-Linux path too.
-          </p>
-        </div>
-      </div>
-
-      <div class="path reveal">
-        <span class="num">03</span>
-        <div>
-          <h4>macOS app <span class="pill">double-click</span></h4>
-          <p>
-            Packaged bundle. No Python, no Terminal. Unsigned for now —
-            macOS will show a "cannot verify developer" warning on first
-            launch. Right-click → Open to get past it. One click, forever.
-            Code signing ($99/year to Apple) lands when the project earns it.
-          </p>
-          <p style="margin-top:16px; color: var(--ink-3);">
-            Download coming shortly. Build recipe lives at
-            <code>packaging/macos/</code> if you want to roll your own now.
-          </p>
-        </div>
-      </div>
+<section id="download">
+  <div class="wrap-narrow">
+    <div class="reveal" style="text-align:center;">
+      <span class="eyebrow">Download</span>
+      <h2 style="margin-left:auto; margin-right:auto;">Ready when you are.</h2>
     </div>
 
-    <div class="prereqs">
-      <div class="prereq reveal">
-        <h5>An Anthropic key</h5>
-        <p>≈$5/mo for a typical student workload. <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
-      </div>
-      <div class="prereq reveal">
-        <h5>A calendar</h5>
-        <p>iCloud works out of the box: your primary Apple ID email and an app-specific password from appleid.apple.com.</p>
-      </div>
-      <div class="prereq reveal">
-        <h5>A task source <em style="color:var(--ink-3);font-style:normal">(optional)</em></h5>
-        <p>Canvas now. Notion / GitHub / Linear / Todoist are ~100 lines each — <a href="https://github.com/ELuria17/schedule-agent/blob/main/docs/providers.md">providers.md</a>.</p>
-      </div>
+    <div class="download-card reveal">
+      <h3>AutoPlan for Mac</h3>
+      <p class="sub">Free. About 40&nbsp;MB. Takes three minutes to set up.</p>
+      <a class="btn btn-primary"
+         href="https://github.com/ELuria17/schedule-agent/releases/latest/download/schedule-agent.dmg">
+        Download the Mac app <span class="arrow">→</span>
+      </a>
+      <p class="note">
+        <strong>First time you open it</strong>, macOS will say "cannot be
+        opened because the developer cannot be verified." That's a default
+        security warning — AutoPlan is safe, it's just not signed yet.
+        The one-time fix: in Finder, <strong>right-click</strong> the
+        AutoPlan app and choose <strong>Open</strong>. After that, it
+        opens normally forever.
+      </p>
+    </div>
+
+    <div class="reveal" style="margin-top: 32px; text-align: center;">
+      <p style="color: var(--ink-2); font-size: 16px; margin-bottom: 10px;">
+        On Windows or Linux? AutoPlan runs there too — just not as a
+        double-click app yet.
+      </p>
+      <a class="btn btn-ghost" href="windows.html">
+        Full Windows walkthrough <span class="arrow">→</span>
+      </a>
+      <p style="color: var(--ink-3); font-size: 13px; margin-top: 12px;">
+        15 minutes, copy-paste commands, no prior setup assumed.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap-narrow">
+    <div class="reveal">
+      <span class="eyebrow">Questions</span>
+      <h2>Things people ask.</h2>
+    </div>
+
+    <div class="faq">
+      <details class="reveal">
+        <summary>Is my data safe? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Yes. AutoPlan runs entirely on your Mac. Your tasks, your
+          calendar, and your credentials never leave your computer. The
+          only thing that talks to the internet is the AI that writes your
+          daily summary — and it only sees the summary it's being asked
+          to write.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Does it mess with my existing calendar? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          No. AutoPlan writes to a calendar you pick (or creates a new
+          one called "Study Blocks"). Your existing events are never
+          edited, moved, or deleted.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>What about Google Calendar or Outlook? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Apple Calendar / iCloud is the only one wired up today. Native
+          <strong>Google Calendar</strong> and <strong>Microsoft Outlook</strong>
+          are next on the roadmap — both will write the same AutoPlan
+          study blocks to their own calendars via their official APIs.
+          In the meantime, if you already sync Google or Outlook events
+          <em>into</em> your Apple Calendar, AutoPlan sees them there and
+          respects them, so it's often a softer switch than it sounds.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>I'm not a student — does this still work? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Yes. The LMS integrations (Canvas today, Google Classroom
+          next) are just one way to get tasks in. You can also type
+          tasks into the hub directly, or tell the AI ("I need to finish
+          the report by Thursday, about two hours") and it'll add them.
+          Todoist, Google Tasks, and Microsoft To Do integrations are on
+          the roadmap for professionals.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Can I use this on Windows or Linux? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Yes — AutoPlan is pure Python under the hood, so it runs on
+          Windows and Linux today. The only difference is setup: on Mac
+          it's a double-click app; on Windows/Linux you copy four
+          commands into Terminal to install it, and it picks cross-platform
+          providers (ntfy.sh for notifications) automatically. Full
+          walkthrough is in the "On Windows or Linux?" expander under the
+          Download section above.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>What is this "$5 a month" for? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          The friendly morning message and the ability to say "I need to
+          do X" in plain English is powered by Claude, an AI made by
+          Anthropic. You pay Anthropic directly for what you use. A
+          typical user spends well under $5 per month. You can also turn
+          the AI off entirely and use AutoPlan as just a scheduler — it
+          still works.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Does AutoPlan work offline? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          The scheduling part does. The natural-language AI part needs an
+          internet connection (it's how your Mac talks to Claude). If
+          you're offline, the app still shows your plan and you can add
+          tasks manually.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>Why should I trust this? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          AutoPlan is <a href="https://github.com/ELuria17/schedule-agent" target="_blank" rel="noopener">open source</a> —
+          every line of code is public and anyone can read it. It's
+          MIT-licensed, which means it's yours to use however you want,
+          free, forever.
+        </p>
+      </details>
+
+      <details class="reveal">
+        <summary>How do I get rid of it? <span class="plus" aria-hidden="true"></span></summary>
+        <p>
+          Drag the AutoPlan app to the Trash. Your calendar events are
+          on your Mac (not in AutoPlan's cloud, because it doesn't have
+          one), so they stay where they are or you can delete them with
+          one click.
+        </p>
+      </details>
     </div>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
-    <div class="foot">
-      <div>
-        <p style="margin-bottom: 8px;">MIT-licensed. Built by Eytan Luria, with help from Claude.</p>
-        <p style="color: var(--ink-3); font-size: 13px;">Not affiliated with Motion, Apple, Canvas, or Anthropic.</p>
-      </div>
-      <div class="doc-links">
-        <a href="https://github.com/ELuria17/schedule-agent/blob/main/docs/getting-started.md">Getting started</a>
-        <a href="https://github.com/ELuria17/schedule-agent/blob/main/docs/providers.md">Providers</a>
-        <a href="https://github.com/ELuria17/schedule-agent/blob/main/docs/deployment.md">Deploy</a>
-        <a href="https://github.com/ELuria17/schedule-agent/blob/main/docs/troubleshooting.md">Troubleshooting</a>
-        <a href="https://github.com/ELuria17/schedule-agent/blob/main/ROADBLOCKS.md">Build log</a>
-      </div>
+    <div>
+      <p>Made by Eytan Luria. MIT licensed.</p>
+      <p style="color: var(--ink-3); font-size: 13px; margin-top: 4px;">
+        Not affiliated with Apple, Canvas, Motion, or Anthropic.
+      </p>
+    </div>
+    <div>
+      <a href="https://github.com/ELuria17/schedule-agent" target="_blank" rel="noopener">Source on GitHub</a>
     </div>
   </div>
 </footer>
 
 <script>
-  // Scroll-entry reveal — IntersectionObserver, respects prefers-reduced-motion.
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const reveals = document.querySelectorAll(".reveal");
+  // ---------- Dark mode toggle ----------
+  const root = document.documentElement;
+  const toggle = document.getElementById('theme-toggle');
+  const saved = localStorage.getItem('autoplan-theme');
+  if (saved === 'dark' || saved === 'light') {
+    root.setAttribute('data-theme', saved);
+  }
+  toggle.addEventListener('click', () => {
+    const osDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const current = root.getAttribute('data-theme') || (osDark ? 'dark' : 'light');
+    const next = current === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('autoplan-theme', next);
+  });
+
+  // ---------- Scroll-reveal ----------
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reveals = document.querySelectorAll('.reveal');
   if (reduceMotion) {
-    reveals.forEach(el => el.classList.add("in-view"));
+    reveals.forEach(el => el.classList.add('in-view'));
   } else {
     const io = new IntersectionObserver((entries) => {
       let delay = 0;
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.style.transitionDelay = `${delay}ms`;
-          entry.target.classList.add("in-view");
-          delay += 50; // subtle stagger within a viewport
-          io.unobserve(entry.target);
-        }
-      });
-    }, { rootMargin: "-40px 0px -10% 0px", threshold: 0.05 });
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.style.transitionDelay = delay + 'ms';
+        entry.target.classList.add('in-view');
+        delay += 60;
+        io.unobserve(entry.target);
+      }
+    }, { rootMargin: '-40px 0px -5% 0px', threshold: 0.05 });
     reveals.forEach(el => io.observe(el));
   }
 </script>

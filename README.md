@@ -261,6 +261,7 @@ schedule-agent-public/
 ├── deploy/systemd/                    # Linux service template + walkthrough
 │   ├── README.md
 │   └── schedule-agent.service
+├── run.bat                            # Windows launcher (double-click to start)
 ├── Dockerfile, .dockerignore          # container deploys
 ├── docker-compose.yml                 #   ↳ with .env + state.db volumes
 ├── schedule_config.py                 # USER-FACING: pick backends here
