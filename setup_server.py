@@ -35,7 +35,7 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 import install as install_mod
@@ -43,6 +43,72 @@ from paths import data_dir, google_token_path, microsoft_token_path
 
 app = FastAPI()
 PROJECT_DIR = Path(__file__).resolve().parent
+
+
+# ---------- Automatic handoff to orchestrator ----------
+# After a successful setup, the user expects `/hub?key=...` to work
+# immediately. The orchestrator (which owns `/hub`) needs to replace
+# this setup_server on port 8787. Manually-relaunching the app is a
+# friction point — especially for non-technical users on Windows where
+# "relaunch" means finding and re-running a Terminal command.
+#
+# We solve it by spawning a detached child process that waits ~2s (for
+# this server to release the port), then execs the orchestrator. Then
+# we kill ourselves. The success page JS polls the orchestrator and
+# redirects to the hub once it's up.
+
+def _spawn_orchestrator_detached() -> None:
+    """Spawn an orchestrator process that survives our exit."""
+    if getattr(sys, "frozen", False):
+        # In a PyInstaller bundle, sys.executable is the app binary
+        # itself; re-launching routes through run.py which detects the
+        # now-populated .env and hands off to orchestrator automatically.
+        cmd = [sys.executable]
+    else:
+        cmd = [sys.executable, str(PROJECT_DIR / "orchestrator.py")]
+
+    # Wrap in a tiny python helper that sleeps first, then execs the
+    # target. The sleep gives this setup_server time to die and release
+    # :8787 before orchestrator tries to bind it.
+    wrapper = (
+        "import time, os; "
+        "time.sleep(2); "
+        f"os.execvp({cmd[0]!r}, {cmd!r})"
+    )
+    popen_kwargs = dict(
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+    )
+    if sys.platform == "win32":
+        popen_kwargs["creationflags"] = (
+            subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    subprocess.Popen([sys.executable, "-c", wrapper], **popen_kwargs)
+
+
+def _handoff_to_orchestrator() -> None:
+    """Detach the orchestrator, give the response time to flush, exit."""
+    import time
+    # Safety: pytest sets PYTEST_CURRENT_TEST for every test run. If it's
+    # set, we're inside a test — don't spawn children and don't kill the
+    # process, or we'll take the test runner down with us.
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    try:
+        _spawn_orchestrator_detached()
+    except Exception:
+        # If spawning fails, don't kill ourselves — the user can still
+        # manually relaunch. The success-page JS will fall back to a
+        # "please relaunch" message when its polling times out.
+        traceback.print_exc()
+        return
+    time.sleep(0.5)   # uvicorn flushes the response in the meantime
+    os._exit(0)       # hard exit — uvicorn won't release the port on SIGINT cleanly here
 
 
 # ---------- Shared helpers ----------
@@ -166,7 +232,7 @@ async def setup_form():
 
 
 @app.post("/setup")
-async def setup_submit(request: Request):
+async def setup_submit(request: Request, background_tasks: BackgroundTasks):
     form = await request.form()
     data = {k: str(v).strip() for k, v in form.items()}
 
@@ -340,6 +406,10 @@ async def setup_submit(request: Request):
 
     final_env = _env_snapshot()
     token = final_env.get("REPLAN_TOKEN", "")
+    # Schedule the handoff to run AFTER this response is flushed to the
+    # browser. Spawns a detached orchestrator and exits this process so
+    # the port is freed for the new server.
+    background_tasks.add_task(_handoff_to_orchestrator)
     return HTMLResponse(_render_success(token, bootstrap_results))
 
 
@@ -1998,6 +2068,10 @@ def _render_microsoft_wizard(*, status: str, client_id: str, tenant: str,
 
 def _render_success(token: str, bootstrap_results: list | None = None) -> str:
     bootstrap_html = _render_bootstrap_notes(bootstrap_results or [])
+    hub_url = f"http://127.0.0.1:8787/hub?key={token}"
+    # Page polls the orchestrator and auto-redirects once it's ready.
+    # The orchestrator is being spawned by BackgroundTasks in the
+    # setup_submit handler — gives us a seamless first-run experience.
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -2005,6 +2079,17 @@ def _render_success(token: str, bootstrap_results: list | None = None) -> str:
 <title>setup · done</title>
 {_FONT_LINK}
 <style>{_PAGE_CSS}</style>
+<style>
+  .spinner {{
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid color-mix(in oklch, var(--accent) 30%, transparent);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; vertical-align: middle;
+    margin-right: 8px;
+  }}
+  @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+  #manual-fallback {{ display: none; }}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -2012,18 +2097,72 @@ def _render_success(token: str, bootstrap_results: list | None = None) -> str:
   <h1>You're in.</h1>
   <p class="lede">
     <code>.env</code> is written, your Anthropic agent is created, and
-    everything is ready to run.
+    AutoPlan is booting up.
   </p>
   <div class="done-card">
-    <h3>What happens next</h3>
-    <ol>
-      <li>Close this tab.</li>
-      <li>Relaunch the app (or restart the orchestrator process).</li>
-      <li>Open <code>http://127.0.0.1:8787/hub?key={token}</code> — that's your hub. Bookmark it.</li>
-    </ol>
+    <h3 id="status-label"><span class="spinner"></span>Starting your hub…</h3>
+    <p style="color: var(--ink-2); font-size: 14px;">
+      Should take about 3 seconds. We'll send you to your hub automatically
+      the moment it's ready.
+    </p>
+    <p style="margin-top: 14px; font-size: 13px; color: var(--ink-3);">
+      <strong>Bookmark this URL for tomorrow:</strong><br>
+      <code style="font-size: 13px;">{hub_url}</code>
+    </p>
+  </div>
+
+  <div id="manual-fallback" class="done-card" style="margin-top: 16px;">
+    <h3>Still starting up…</h3>
+    <p style="color: var(--ink-2); font-size: 14px;">
+      Your hub is taking longer than expected to come online. Click the
+      link below to jump to it manually, or if that gives a "Not Found"
+      error, relaunch the AutoPlan app from your Applications folder.
+    </p>
+    <p style="margin-top: 12px;">
+      <a href="{hub_url}" class="btn btn-primary" style="display: inline-block; padding: 10px 18px;">
+        Open hub manually →
+      </a>
+    </p>
   </div>
   {bootstrap_html}
 </div>
+<script>
+(function() {{
+  var hubUrl = {hub_url!r};
+  var statusLabel = document.getElementById('status-label');
+  var fallback = document.getElementById('manual-fallback');
+  var attempts = 0;
+  var maxAttempts = 20;  // ~20s total — generous
+
+  function poll() {{
+    attempts++;
+    // HEAD request so we don't accidentally burn server cycles rendering the hub.
+    fetch(hubUrl, {{method: 'HEAD', credentials: 'include', cache: 'no-store'}})
+      .then(function(r) {{
+        if (r.ok) {{
+          statusLabel.textContent = 'Ready — opening your hub.';
+          window.location.replace(hubUrl);
+          return;
+        }}
+        retry();
+      }})
+      .catch(function() {{ retry(); }});
+  }}
+
+  function retry() {{
+    if (attempts >= maxAttempts) {{
+      statusLabel.innerHTML = 'Your hub is taking longer than usual.';
+      fallback.style.display = '';
+      return;
+    }}
+    setTimeout(poll, 1000);
+  }}
+
+  // Wait a beat for setup_server to die + orchestrator to come up,
+  // then start polling.
+  setTimeout(poll, 1500);
+}})();
+</script>
 </body></html>"""
 
 

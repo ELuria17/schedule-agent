@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Hardened runtime entitlements for a PyInstaller-packaged Python app.
+       Notarization requires the hardened runtime; these four switches are
+       the standard PyInstaller-on-macOS set. Without them the signed
+       binary crashes on launch because CPython's bytecode execution and
+       the way PyInstaller unpacks its bundled .pyd/.so modules both run
+       into hardened-runtime restrictions. -->
+
+  <!-- CPython's interpreter writes-then-executes bytecode pages. -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- PyInstaller bundles third-party .dylib/.so files that aren't
+       signed by our developer id; library validation refuses to load
+       them without this. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+
+  <!-- Some wheels (numpy, anything with a bundled JIT like cffi) use
+       writable+executable memory pages directly. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!-- PyInstaller sets DYLD_LIBRARY_PATH for the bundled libs. Hardened
+       runtime strips DYLD_* by default unless this is set. -->
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+</dict>
+</plist>
