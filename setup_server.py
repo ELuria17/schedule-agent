@@ -58,8 +58,16 @@ PROJECT_DIR = Path(__file__).resolve().parent
 # redirects to the hub once it's up.
 
 def _spawn_orchestrator_detached() -> None:
-    """Spawn an orchestrator process that survives our exit."""
-    if getattr(sys, "frozen", False):
+    """Spawn an orchestrator process that survives our exit.
+
+    SCHEDULE_AGENT_ORCHESTRATOR_CMD env var overrides what gets spawned —
+    space-separated argv. The E2E test harness uses this to point at a
+    minimal fake orchestrator for the handoff target."""
+    override = os.environ.get("SCHEDULE_AGENT_ORCHESTRATOR_CMD", "").strip()
+    if override:
+        import shlex
+        cmd = shlex.split(override)
+    elif getattr(sys, "frozen", False):
         # In a PyInstaller bundle, sys.executable is the app binary
         # itself; re-launching routes through run.py which detects the
         # now-populated .env and hands off to orchestrator automatically.
@@ -388,18 +396,28 @@ async def setup_submit(request: Request, background_tasks: BackgroundTasks):
     for k, v in env.items():
         if v:
             os.environ[k] = v
-    try:
-        import importlib
-        import setup as setup_mod
-        importlib.reload(setup_mod)
-        setup_mod.main()
-    except Exception as ex:
-        return HTMLResponse(
-            _render_error(f"Saved .env, but Anthropic setup failed: "
-                          f"{type(ex).__name__}: {ex}. "
-                          f"Check your API key and retry."),
-            status_code=500,
-        )
+    # SCHEDULE_AGENT_SKIP_ANTHROPIC=1 bypasses the real agent-creation call,
+    # writing dummy ENVIRONMENT_ID / AGENT_ID values instead so the resulting
+    # .env still reads as "configured." Used by the E2E test harness
+    # (scripts/e2e_setup_flow.py) so it can exercise the full wizard flow
+    # without spending real Anthropic credits.
+    if os.environ.get("SCHEDULE_AGENT_SKIP_ANTHROPIC") in ("1", "true", "yes"):
+        env["ENVIRONMENT_ID"] = env.get("ENVIRONMENT_ID") or "e2e-test-env"
+        env["AGENT_ID"] = env.get("AGENT_ID") or "e2e-test-agent"
+        install_mod._write_env(env)
+    else:
+        try:
+            import importlib
+            import setup as setup_mod
+            importlib.reload(setup_mod)
+            setup_mod.main()
+        except Exception as ex:
+            return HTMLResponse(
+                _render_error(f"Saved .env, but Anthropic setup failed: "
+                              f"{type(ex).__name__}: {ex}. "
+                              f"Check your API key and retry."),
+                status_code=500,
+            )
 
     import bootstrap
     bootstrap_results = bootstrap.run_all()
