@@ -1,5 +1,16 @@
 # schedule-agent-public
 
+> **Looking for the simple Mac-only download?** The self-hosted version lives at the
+> [`v0.2.0-local`](https://github.com/ELuria17/schedule-agent/releases/tag/v0.2.0-local)
+> tag — signed, notarized, drag-to-Applications install. That fork-point is frozen
+> and will keep working for friends regardless of where development heads next.
+> See [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) for the snapshot.
+>
+> Native iPhone + Mac apps via the App Store are next on the roadmap; this
+> self-hosted Python version stays alive in parallel.
+
+---
+
 Motion-style constraint-solving personal scheduler. Reads tasks from an LMS and/or
 a to-do app, places them on a calendar around your fixed commitments (classes,
 meetings, working hours), re-solves on every change, and pings you via a chat
