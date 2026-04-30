@@ -141,6 +141,20 @@ gives you a stable `<mac>.<tailnet>.ts.net` hostname that works from any
 network) — see ROADBLOCKS §T1–T3 for the full story of how Cloudflare
 tunnels and `tailscale serve` each fell short.
 
+### HTTPS via tailscale serve
+
+If you want the hub on `https://...` (no Safari "Not Secure" flag), run:
+
+```bash
+python scripts/enable_tailscale_https.py
+```
+
+Prereqs: enable MagicDNS and HTTPS certificates in your Tailscale admin
+console first (DNS tab → "Enable HTTPS"). The script provisions a cert
+for your tailnet hostname and sets `tailscale serve` to proxy
+`https://<host>/` → `http://localhost:8787/`. Pass `--port` if you bound
+the orchestrator somewhere other than 8787.
+
 ---
 
 ## Upgrades

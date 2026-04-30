@@ -228,3 +228,94 @@ class TestPlace:
         chunks, _ = place(tasks, slots, now)
         starts = [c.start for c in chunks]
         assert starts == sorted(starts)
+
+
+class TestTaskDeps:
+    def test_dep_pushes_dependent_after_dep_end(self):
+        now = _utc(2026, 4, 21, 9)
+        slots = [Interval(_utc(2026, 4, 21, 10), _utc(2026, 4, 21, 14))]  # 4h
+        tasks = [
+            {"id": 1, "title": "writeup", "duration_min": 60,
+             "min_chunk_min": 30, "max_chunk_min": 60, "priority": "medium"},
+            {"id": 2, "title": "submit",  "duration_min": 60,
+             "min_chunk_min": 30, "max_chunk_min": 60, "priority": "medium"},
+        ]
+        deps = {2: [1]}  # submit depends on writeup
+        chunks, at_risk = place(tasks, slots, now, deps=deps)
+        assert at_risk == []
+        by_task = {c.task_id: c for c in chunks}
+        assert by_task[2].start >= by_task[1].end
+
+    def test_unplaced_dep_marks_dependent_at_risk(self):
+        now = _utc(2026, 4, 21, 9)
+        slots = [Interval(_utc(2026, 4, 21, 10), _utc(2026, 4, 21, 11))]  # only 60m
+        tasks = [
+            {"id": 1, "title": "huge", "duration_min": 240,
+             "min_chunk_min": 60, "max_chunk_min": 120, "priority": "high"},
+            {"id": 2, "title": "tiny", "duration_min": 30,
+             "min_chunk_min": 30, "max_chunk_min": 30, "priority": "high"},
+        ]
+        deps = {2: [1]}
+        chunks, at_risk = place(tasks, slots, now, deps=deps)
+        # Task 1 took the only slot; task 2 has nowhere to go after it.
+        ids_at_risk = {r.task_id for r in at_risk}
+        assert 2 in ids_at_risk
+        # And task 2 is flagged for the dep reason, not deadline.
+        r2 = next(r for r in at_risk if r.task_id == 2)
+        assert "depend" in r2.reason or "blocked" in r2.reason
+
+    def test_done_dep_does_not_block(self):
+        # If a dep id isn't in active_tasks (already done & filtered),
+        # the dependent should still place freely.
+        now = _utc(2026, 4, 21, 9)
+        slots = [Interval(_utc(2026, 4, 21, 10), _utc(2026, 4, 21, 11))]
+        tasks = [
+            {"id": 2, "title": "ready", "duration_min": 60,
+             "min_chunk_min": 30, "max_chunk_min": 60, "priority": "medium"},
+        ]
+        deps = {2: [1]}  # task 1 is already done → not in active list
+        chunks, at_risk = place(tasks, slots, now, deps=deps)
+        assert len(chunks) == 1
+        assert at_risk == []
+
+    def test_dep_cycle_does_not_hang(self):
+        now = _utc(2026, 4, 21, 9)
+        slots = [Interval(_utc(2026, 4, 21, 10), _utc(2026, 4, 21, 13))]  # 3h
+        tasks = [
+            {"id": 1, "title": "a", "duration_min": 30,
+             "min_chunk_min": 30, "max_chunk_min": 30, "priority": "asap"},
+            {"id": 2, "title": "b", "duration_min": 30,
+             "min_chunk_min": 30, "max_chunk_min": 30, "priority": "low"},
+        ]
+        deps = {1: [2], 2: [1]}  # mutual cycle
+        chunks, _ = place(tasks, slots, now, deps=deps)
+        # Both should still get placed (cycle break by priority).
+        ids = {c.task_id for c in chunks}
+        assert ids == {1, 2}
+
+
+class TestPreferredWindow:
+    def test_morning_preference_picks_morning_slot(self):
+        # Two equal-length slots: 06:00 UTC (~02:00 ET, night) and 14:00 UTC (~10:00 ET, morning).
+        # With TZ=America/New_York the second is "morning".
+        # Use times that are unambiguous regardless of DST.
+        now = _utc(2026, 4, 21, 0)
+        # 14:00 UTC = 10:00 ET (morning); 22:00 UTC = 18:00 ET (evening)
+        slot_eve = Interval(_utc(2026, 4, 21, 22), _utc(2026, 4, 21, 23))
+        slot_morn = Interval(_utc(2026, 4, 21, 14), _utc(2026, 4, 21, 15))
+        slots = [slot_eve, slot_morn]  # eve listed first
+        task = {"id": 1, "title": "homework", "duration_min": 60,
+                "min_chunk_min": 30, "max_chunk_min": 60,
+                "priority": "medium", "preferred_window": "morning"}
+        chunks, _ = place([task], slots, now)
+        assert len(chunks) == 1
+        assert chunks[0].start == _utc(2026, 4, 21, 14)
+
+    def test_no_preference_keeps_earliest_slot(self):
+        now = _utc(2026, 4, 21, 0)
+        slot_eve = Interval(_utc(2026, 4, 21, 22), _utc(2026, 4, 21, 23))
+        slot_morn = Interval(_utc(2026, 4, 21, 14), _utc(2026, 4, 21, 15))
+        task = {"id": 1, "title": "homework", "duration_min": 60,
+                "min_chunk_min": 30, "max_chunk_min": 60, "priority": "medium"}
+        chunks, _ = place([task], [slot_eve, slot_morn], now)
+        assert chunks[0].start == _utc(2026, 4, 21, 14)  # earliest wins

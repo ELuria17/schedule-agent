@@ -80,7 +80,7 @@ fi
 # Best-effort check that the keychain has a notarytool-compatible entry.
 # We probe with `history` but treat network/transient failures as "keep
 # going" — only fail if the error is specifically a missing profile.
-NOTARY_PROBE="$(xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --limit 1 2>&1 || true)"
+NOTARY_PROBE="$(xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" 2>&1 || true)"
 if echo "$NOTARY_PROBE" | grep -qi "could not find.*profile\|profile.*not found\|could not load profile"; then
     echo "ERROR: Keychain profile '$NOTARY_PROFILE' isn't stored in your keychain." >&2
     echo "       Run this once, replacing the three placeholders:" >&2
@@ -157,7 +157,7 @@ xcrun notarytool submit "$DMG" \
 if [ $? -ne 0 ]; then
     echo ""
     echo "Notarization failed. Fetching the log of the last submission:" >&2
-    SUBMISSION_ID="$(xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --limit 1 \
+    SUBMISSION_ID="$(xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" \
                      | awk '/id:/ {print $2; exit}')"
     if [ -n "$SUBMISSION_ID" ]; then
         xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "$NOTARY_PROFILE" >&2

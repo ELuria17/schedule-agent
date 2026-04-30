@@ -18,6 +18,8 @@ Both are preserved across read/write, so a round-trip is stable.
 """
 from __future__ import annotations
 
+import functools
+import time
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -31,6 +33,57 @@ from .base import CalendarEvent, CalendarProvider
 
 AUTO_TAG = "AUTO-SCHED"
 UTC = ZoneInfo("UTC")
+
+
+# urllib3 / requests connection-level errors we should react to by dropping
+# the cached connection pool and retrying once. Anything more catastrophic
+# (auth failures, 4xx responses) bubbles up unchanged.
+_RECONNECT_ERROR_NAMES = (
+    "ProtocolError",          # urllib3 keepalive timeout (ROADBLOCKS §I5)
+    "ConnectionError",        # requests / urllib3 generic
+    "ConnectionResetError",
+    "RemoteDisconnected",
+    "BrokenPipeError",
+    "TimeoutError",
+)
+
+
+def _looks_like_reconnect_error(exc: BaseException) -> bool:
+    """True for errors that warrant a reset+retry rather than a hard failure.
+
+    We match by class-name walk (not isinstance) because the error can come
+    from urllib3, http.client, builtins, or even bubble up wrapped in a
+    caldav.lib.error.* — and we don't want the import surface to depend on
+    every layer's internal types.
+    """
+    for cls in type(exc).__mro__:
+        if cls.__name__ in _RECONNECT_ERROR_NAMES:
+            return True
+    cause = exc.__cause__ or exc.__context__
+    if cause is not None and cause is not exc:
+        return _looks_like_reconnect_error(cause)
+    return False
+
+
+def _retry_on_stale_connection(method):
+    """Decorate a provider method so a single stale-conn error is retried.
+
+    The decorator calls `self.reset()` (drops the cached principal) and
+    re-invokes the method once. A second failure propagates. Sleep is short
+    (250ms) — the goal is to absorb keepalive timeouts, not to wait out a
+    real outage.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except Exception as exc:
+            if not _looks_like_reconnect_error(exc):
+                raise
+            self.reset()
+            time.sleep(0.25)
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 class ICloudCalDAVProvider(CalendarProvider):
@@ -93,6 +146,7 @@ class ICloudCalDAVProvider(CalendarProvider):
 
     # ---- CalendarProvider interface ----
 
+    @_retry_on_stale_connection
     def list_events(
         self, start_utc: datetime, end_utc: datetime, *,
         include_write_calendar: bool = True,
@@ -122,6 +176,7 @@ class ICloudCalDAVProvider(CalendarProvider):
                 continue
         return out
 
+    @_retry_on_stale_connection
     def create_auto_event(
         self, *, start_utc: datetime, end_utc: datetime,
         title: str, notes: str = "",
@@ -150,6 +205,7 @@ class ICloudCalDAVProvider(CalendarProvider):
             calendar_name=cal.name or self.write_calendar_name,
         )
 
+    @_retry_on_stale_connection
     def delete_event(self, event: CalendarEvent) -> None:
         # Prefer the fast path: known source_handle (URL) → raw DELETE.
         if event.source_handle:
@@ -208,6 +264,7 @@ class ICloudCalDAVProvider(CalendarProvider):
                 return cal
         return None
 
+    @_retry_on_stale_connection
     def _raw_delete(self, url: str) -> None:
         # Raw DELETE intentionally omits If-Match (caldav library would send
         # one, and iCloud returns 412 Precondition Failed when its ETag

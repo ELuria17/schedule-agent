@@ -359,6 +359,48 @@ def reject(task_id: int) -> Optional[dict]:
     return get(task_id)
 
 
+def set_deps(task_id: int, depends_on_ids: Iterable[int]) -> None:
+    """Replace the dependency set for `task_id`.
+
+    Self-dependencies and missing tasks are silently dropped.
+    """
+    deps = {int(x) for x in depends_on_ids if int(x) != int(task_id)}
+    with connect() as conn:
+        conn.execute("DELETE FROM task_deps WHERE task_id=?", (task_id,))
+        if not deps:
+            return
+        existing = {
+            r["id"] for r in conn.execute(
+                f"SELECT id FROM tasks WHERE id IN ({','.join('?' * len(deps))})",
+                tuple(deps),
+            ).fetchall()
+        }
+        conn.executemany(
+            "INSERT OR IGNORE INTO task_deps(task_id, depends_on_id) VALUES(?,?)",
+            [(task_id, d) for d in deps if d in existing],
+        )
+
+
+def get_deps(task_id: int) -> list[int]:
+    """Direct dependencies (`task_id` depends on these)."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT depends_on_id FROM task_deps WHERE task_id=?",
+            (task_id,),
+        ).fetchall()
+    return [r["depends_on_id"] for r in rows]
+
+
+def get_all_deps() -> dict[int, list[int]]:
+    """{task_id: [depends_on_id, ...]} for all rows. Used by the solver."""
+    with connect() as conn:
+        rows = conn.execute("SELECT task_id, depends_on_id FROM task_deps").fetchall()
+    out: dict[int, list[int]] = {}
+    for r in rows:
+        out.setdefault(r["task_id"], []).append(r["depends_on_id"])
+    return out
+
+
 def list_by_source(source: str) -> list[dict]:
     with connect() as conn:
         rows = conn.execute(

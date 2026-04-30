@@ -497,24 +497,34 @@ Items we knowingly deferred but should revisit before any "for other people" rel
 
 1. **Shabbat / religious observance blocking** — deferred from the Motion rebuild
    plan. Needs Hebcal API integration (free) or manual `config_blocks` entries.
-2. **Task dependencies** — `task_deps` table exists in the schema but solver
-   doesn't enforce it yet.
-3. **Preferred-window soft bonus** — field exists on the task but the greedy
-   doesn't use it.
-4. **Automatic retry-on-reconnect for CalDAV** — see I5. Right now one stale
-   connection can fail one resolve cycle.
-5. **macOS wake hooks** — see L1. Would eliminate the hub-load-kick workaround.
-6. **HTTPS on Tailscale via `tailscale serve`** — cosmetic; Safari flags HTTP as
-   "Not Secure" even though WireGuard encrypts underneath.
-7. **Session persistence in SQLite** — session transcripts currently lost on
-   orchestrator restart. For multi-user publish, move SESSIONS/SESSION_ORDER to
-   a DB table.
-8. **`@app.on_event("startup")` → lifespan handler** — see F1.
-9. **Agent prompt regression tests** — we've updated the agent system prompt
-   several times via `agents.update`. Each update risks regressing behavior. No
-   automated check that the agent still respects class times, duration rules, etc.
-10. **Test-agent itself** — the thing that prompted this doc. Should cover every
-    "Test signal" line above.
+2. ~~**Task dependencies**~~ — done. `task_deps` is enforced in `solver.place()`
+   via topological ordering with priority as the within-level tie-breaker; deps
+   in cycles fall back to priority-only placement.
+3. ~~**Preferred-window soft bonus**~~ — done. `_split_task_across_slots`
+   reorders free slots so preferred-window slots are tried first per task.
+4. ~~**Automatic retry-on-reconnect for CalDAV**~~ — done. `@_retry_on_stale_connection`
+   on `ICloudCalDAVProvider`'s public methods drops the cached principal and
+   retries once on `ProtocolError` / `ConnectionError`.
+5. ~~**macOS wake hooks**~~ — done. `wake_watchdog.py` detects sleep>resume by
+   monotonic-vs-wallclock drift and kicks a resolve + morning_plan on wake.
+   Portable across macOS / Linux / Windows.
+6. ~~**HTTPS on Tailscale via `tailscale serve`**~~ — done. `scripts/enable_tailscale_https.py`
+   provisions the cert and configures `tailscale serve` to front-end the orchestrator.
+7. ~~**Session persistence in SQLite**~~ — done. `history.upsert_session` /
+   `append_session_event` mirror sessions to disk; `/api/sessions` and
+   `/api/agents` merge in-memory live state with persisted history so the hub
+   shows full transcripts after restart.
+8. ~~**`@app.on_event("startup")` → lifespan handler**~~ — done. Replaced with
+   an `asynccontextmanager` `_lifespan` passed to `FastAPI(lifespan=...)`.
+9. ~~**Agent prompt regression tests**~~ — done. `tests/test_agent_prompt.py`
+   asserts the load-bearing invariants of `setup.SYSTEM` and `TOOLS` (priority
+   tier coverage, no calendar_* tool, preferred_window enum matches the solver,
+   etc.).
+10. ~~**Test-agent itself**~~ — done. `tests/test_roadblocks_signals.py` parses
+    every `**Test signal:**` line in this file and pairs it with either a
+    handler (13 currently auto-runnable) or an explicit `skip(...)` with the
+    rationale. A coverage check fails if a new section is added without
+    registering a handler or skip.
 
 ---
 

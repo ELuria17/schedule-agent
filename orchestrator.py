@@ -471,10 +471,15 @@ def run_session(agent_key: str, kickoff: Optional[str] = None):
         lock.release()
 
 # ========== FastAPI ==========
-app = FastAPI()
+from contextlib import asynccontextmanager  # noqa: E402
 
-@app.on_event("startup")
-async def _capture_loop():
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Startup/shutdown wiring. Replaces deprecated @app.on_event decorators
+    (ROADBLOCKS §F1). Code before `yield` runs at startup; code after runs
+    on shutdown — currently nothing because every long-lived resource lives
+    in module-scope singletons (BackgroundScheduler, watchdog thread, etc.)
+    that the OS reaps on process exit."""
     global _main_loop
     _main_loop = asyncio.get_running_loop()
     # Kick an initial sync+resolve in the background so the hub shows current
@@ -486,6 +491,9 @@ async def _capture_loop():
     ).start()
     # First-wake trigger: morning_plan no-ops if already run today.
     threading.Thread(target=morning_plan, daemon=True).start()
+    yield
+
+app = FastAPI(lifespan=_lifespan)
 
 def _authed(request: Request, cookie_token: Optional[str]) -> bool:
     key = request.query_params.get("key")
@@ -550,17 +558,30 @@ async def providers_health_endpoint(request: Request, replan_token: Optional[str
 @app.get("/api/agents")
 async def list_agents(request: Request, replan_token: Optional[str] = Cookie(default=None)):
     _require_auth(request, replan_token)
+    # Build a 1-deep "last session per agent_key" map. In-memory SESSION_ORDER
+    # wins for live sessions; persisted history fills in everything else so the
+    # UI shows the most recent run even right after an orchestrator restart.
+    persisted = {r["id"]: r for r in history.list_sessions(limit=50)}
+    last_by_agent: dict = {}
+    for sid in SESSION_ORDER:
+        s = SESSIONS.get(sid)
+        if not s or s.agent_key in last_by_agent:
+            continue
+        last_by_agent[s.agent_key] = {
+            "id": s.id, "status": s.status,
+            "started_at": s.started_at.isoformat(timespec="seconds"),
+        }
+    for row in persisted.values():
+        last_by_agent.setdefault(row["agent_key"], {
+            "id": row["id"], "status": row["status"],
+            "started_at": row["started_at"],
+        })
+
     out = []
     for key, cfg in AGENTS.items():
-        running = _agent_locks[key].locked()
-        last = None
-        for sid in SESSION_ORDER:
-            s = SESSIONS.get(sid)
-            if s and s.agent_key == key:
-                last = {"id": s.id, "started_at": s.started_at.isoformat(timespec="seconds"), "status": s.status}
-                break
         out.append({"key": key, "name": cfg["name"], "description": cfg["description"],
-                    "model": cfg["model"], "running": running, "last": last})
+                    "model": cfg["model"], "running": _agent_locks[key].locked(),
+                    "last": last_by_agent.get(key)})
     return {"agents": out}
 
 @app.post("/api/agents/{agent_key}/trigger")
@@ -1135,6 +1156,25 @@ scheduler = BackgroundScheduler(timezone=TZ)
 scheduler.add_job(_poll_solver, "interval", minutes=15, id="solver_poll",
                   coalesce=True, max_instances=1)
 scheduler.start()
+
+
+# --- Wake watchdog (replaces the hub-load-kick workaround for ROADBLOCKS §L1) ---
+# The Mac (or any host) sleeps; APScheduler's interval timer pauses with it,
+# so the next poll fires on the regular 15-min boundary after wake. The
+# watchdog checks every 30s for monotonic-vs-wallclock drift; when wallclock
+# jumps ahead by >60s we know the host just resumed, and we kick a resolve
+# right away.
+import wake_watchdog  # noqa: E402
+
+def _on_wake(slept_seconds: float):
+    threading.Thread(
+        target=_do_solver_run,
+        kwargs={"trigger": "wake", "sync": True},
+        daemon=True,
+    ).start()
+    threading.Thread(target=morning_plan, daemon=True).start()
+
+wake_watchdog.start_watchdog(_on_wake)
 
 if __name__ == "__main__":
     import uvicorn

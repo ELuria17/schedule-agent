@@ -255,13 +255,41 @@ def priority_score(task: dict, now: datetime) -> float:
 
 # ---------- Placement ----------
 
-def _split_task_across_slots(task: dict, free: list[Interval], now_utc: datetime) -> tuple[list[Chunk], int]:
+_PREFERRED_WINDOW_RANGES = {
+    # local-hour ranges; midpoint of a candidate slot is checked against these
+    "morning":   (5, 12),
+    "afternoon": (12, 18),
+    "evening":   (18, 23),
+}
+
+
+def _slot_in_preferred_window(slot: Interval, preferred: Optional[str]) -> bool:
+    """Soft preference: does the slot's local-time midpoint fall in the band?"""
+    if not preferred:
+        return False
+    bounds = _PREFERRED_WINDOW_RANGES.get(preferred)
+    if not bounds:
+        return False
+    mid = slot.start + (slot.end - slot.start) / 2
+    h = _local(mid).hour
+    return bounds[0] <= h < bounds[1]
+
+
+def _split_task_across_slots(
+    task: dict,
+    free: list[Interval],
+    now_utc: datetime,
+    earliest_start: Optional[datetime] = None,
+) -> tuple[list[Chunk], int]:
     """
-    Place a task's duration across free slots, respecting min/max chunk size
-    and the task's deadline. Returns (placed_chunks, minutes_not_placed).
+    Place a task's duration across free slots, respecting min/max chunk size,
+    the task's deadline, an optional `earliest_start` floor (used to honor
+    task_deps), and a soft preferred-window bonus. Returns
+    (placed_chunks, minutes_not_placed).
 
     Mutates `free` in-place: consumes used portions so subsequent tasks see
-    reduced availability.
+    reduced availability. Slot iteration order is reordered per task to put
+    preferred-window slots first; this is the soft bonus from ROADBLOCKS §3.
     """
     needed = int(task["duration_min"])
     min_chunk = int(task.get("min_chunk_min") or 30)
@@ -280,6 +308,17 @@ def _split_task_across_slots(task: dict, free: list[Interval], now_utc: datetime
     if deadline_utc is not None and deadline_utc < now_utc:
         deadline_utc = None
 
+    earliest = _ensure_utc(earliest_start) if earliest_start else None
+    preferred = task.get("preferred_window")
+
+    # Reorder `free` so preferred-window slots are tried first. Slot order
+    # is otherwise arbitrary across tasks (greedy mutates it as it consumes
+    # space), so this reshuffle is safe — chunks are sorted by start in `place()`.
+    if preferred:
+        free.sort(key=lambda s: (0 if _slot_in_preferred_window(s, preferred) else 1, s.start))
+    else:
+        free.sort(key=lambda s: s.start)
+
     placed: list[Chunk] = []
     remaining = needed
     i = 0
@@ -289,73 +328,171 @@ def _split_task_across_slots(task: dict, free: list[Interval], now_utc: datetime
             i += 1
             continue
         if deadline_utc is not None and slot.start >= deadline_utc:
-            break  # past the deadline — skip rest
+            i += 1
+            continue
+        # Honor a dep-derived floor: skip slots that start before all deps end.
+        slot_start = slot.start
+        if earliest is not None and slot_start < earliest:
+            if slot.end <= earliest:
+                i += 1
+                continue
+            slot_start = earliest
+            if (slot.end - slot_start).total_seconds() / 60 < min_chunk:
+                i += 1
+                continue
+        usable_min = int((slot.end - slot_start).total_seconds() / 60)
         # How much can we take from this slot?
-        take = min(remaining, slot.duration_min, max_chunk)
+        take = min(remaining, usable_min, max_chunk)
         if take < min_chunk:
             # Sub-minimum remainder — don't create a sliver chunk. Either the
             # task is 99% placed (remaining was tiny) or this slot is smaller
             # than the task's min_chunk.
-            break
-        slot_end_candidate = slot.start + timedelta(minutes=take)
+            i += 1
+            continue
+        slot_end_candidate = slot_start + timedelta(minutes=take)
         if deadline_utc is not None and slot_end_candidate > deadline_utc:
             # Cap at deadline
-            take = max(0, int((deadline_utc - slot.start).total_seconds() / 60))
+            take = max(0, int((deadline_utc - slot_start).total_seconds() / 60))
             if take < min_chunk:
                 i += 1
                 continue
-            slot_end_candidate = slot.start + timedelta(minutes=take)
+            slot_end_candidate = slot_start + timedelta(minutes=take)
 
         placed.append(Chunk(
             task_id=task["id"],
             title=task["title"],
-            start=slot.start,
+            start=slot_start,
             end=slot_end_candidate,
             notes=task.get("notes") or "",
         ))
         remaining -= take
-        # Consume used portion from slot
+        # Consume used portion from slot. If we trimmed the leading edge for
+        # `earliest`, the gap before slot_start is unusable for this task and
+        # also for any later task with deps (they'd hit the same floor or a
+        # later one). Drop it cleanly.
         new_start = slot_end_candidate
         if new_start >= slot.end:
             free.pop(i)
-            # don't advance i (we just removed the slot at i)
         else:
             free[i] = Interval(new_start, slot.end)
-            # Advance to next slot if this one is now too small for a min chunk
             if free[i].duration_min < min_chunk:
                 free.pop(i)
-                # don't advance i
             else:
-                # Keep i here so we can use this slot again if a smaller task wants it
-                # But we already consumed a chunk; move to i+1 so chunks of the same task
-                # don't all pile into one slot if max_chunk < slot size.
                 i += 1
     return placed, remaining
 
 
-def place(active_tasks: list[dict], free: list[Interval], now_utc: datetime
+def _topo_order(tasks_by_id: dict[int, dict],
+                deps: dict[int, list[int]],
+                priority_key) -> tuple[list[dict], set[int]]:
+    """Kahn's algorithm with priority as the within-level tie-breaker.
+
+    Tasks whose deps reference IDs not in `tasks_by_id` (e.g. a dep that's
+    already done and filtered out of `active`) are treated as unblocked w.r.t.
+    that dep.
+
+    Returns (ordered_tasks, cycle_member_ids). Cycle members are emitted at
+    the end in priority order; the caller should ignore dep enforcement for
+    those ids (otherwise a mutual dep would deadlock both tasks into at-risk).
+    """
+    indeg: dict[int, int] = {tid: 0 for tid in tasks_by_id}
+    blocks: dict[int, list[int]] = {tid: [] for tid in tasks_by_id}
+    for tid in tasks_by_id:
+        for d in deps.get(tid, []):
+            if d in tasks_by_id:
+                blocks[d].append(tid)
+                indeg[tid] += 1
+
+    ready = [tid for tid, n in indeg.items() if n == 0]
+    out: list[dict] = []
+    placed_ids: set[int] = set()
+    while ready:
+        ready.sort(key=lambda tid: priority_key(tasks_by_id[tid]), reverse=True)
+        tid = ready.pop(0)
+        out.append(tasks_by_id[tid])
+        placed_ids.add(tid)
+        for nxt in blocks.get(tid, []):
+            indeg[nxt] -= 1
+            if indeg[nxt] == 0:
+                ready.append(nxt)
+
+    cycle_members: set[int] = set()
+    if len(out) < len(tasks_by_id):
+        leftover_ids = [tid for tid in tasks_by_id if tid not in placed_ids]
+        leftover_ids.sort(key=lambda tid: priority_key(tasks_by_id[tid]), reverse=True)
+        for tid in leftover_ids:
+            out.append(tasks_by_id[tid])
+            cycle_members.add(tid)
+    return out, cycle_members
+
+
+def place(active_tasks: list[dict], free: list[Interval], now_utc: datetime,
+          deps: Optional[dict[int, list[int]]] = None
           ) -> tuple[list[Chunk], list[AtRisk]]:
     """
-    Greedy placement: sort by priority_score desc, then place each task's
-    minutes across available free slots (chunking as needed).
+    Greedy placement: topo-sort by `task_deps` (priority score is the
+    within-level tie-breaker), then place each task's minutes across available
+    free slots. A task with deps cannot start before the latest end-time of
+    all its deps' placed chunks; if a dep failed to place fully, the dependent
+    task is marked at-risk and skipped.
 
     `free` is mutated as slots are consumed.
     """
-    ordered = sorted(active_tasks, key=lambda t: priority_score(t, now_utc), reverse=True)
+    pri_key = lambda t: priority_score(t, now_utc)
+    by_id = {int(t["id"]): t for t in active_tasks}
+    deps = deps or {}
+    ordered, cycle_ids = _topo_order(by_id, deps, pri_key)
+
+    placed_chunks_by_task: dict[int, list[Chunk]] = {}
+    fully_placed: set[int] = set()
+    at_risk_ids: set[int] = set()
     all_chunks: list[Chunk] = []
     at_risk: list[AtRisk] = []
     for t in ordered:
-        placed, remaining = _split_task_across_slots(t, free, now_utc)
+        tid = int(t["id"])
+        # Resolve earliest start from active deps. Cycle members ignore
+        # deps — otherwise a mutual cycle would deadlock both members.
+        earliest = None
+        unmet = False
+        if tid not in cycle_ids:
+            for d in deps.get(tid, []):
+                if d not in by_id:
+                    continue  # dep already done / filtered
+                if d in at_risk_ids and d not in fully_placed:
+                    unmet = True
+                    break
+                d_chunks = placed_chunks_by_task.get(d, [])
+                if not d_chunks:
+                    # Dep is active but produced zero placement — same effect as at-risk.
+                    unmet = True
+                    break
+                d_end = max(c.end for c in d_chunks)
+                earliest = d_end if earliest is None else max(earliest, d_end)
+
+        if unmet:
+            at_risk.append(AtRisk(
+                task_id=tid, title=t["title"],
+                duration_needed_min=int(t["duration_min"]),
+                duration_placed_min=0,
+                reason="blocked by unplaced dependency",
+            ))
+            at_risk_ids.add(tid)
+            continue
+
+        placed, remaining = _split_task_across_slots(t, free, now_utc, earliest_start=earliest)
+        placed_chunks_by_task[tid] = placed
         all_chunks.extend(placed)
         if remaining > 0:
             placed_min = sum(c.duration_min for c in placed)
             at_risk.append(AtRisk(
-                task_id=t["id"],
-                title=t["title"],
+                task_id=tid, title=t["title"],
                 duration_needed_min=int(t["duration_min"]),
                 duration_placed_min=placed_min,
                 reason=("over deadline" if t.get("deadline_ts") else "insufficient slots"),
             ))
+            at_risk_ids.add(tid)
+        else:
+            fully_placed.add(tid)
     # Sort chunks by start time for stable output
     all_chunks.sort(key=lambda c: c.start)
     return all_chunks, at_risk
@@ -404,7 +541,8 @@ def resolve(
         pass  # learning is best-effort; never block a plan cycle
 
     active = tasks_mod.list_active()
-    chunks, at_risk = place(active, slots, now)
+    deps = tasks_mod.get_all_deps()
+    chunks, at_risk = place(active, slots, now, deps=deps)
     scheduled_min = sum(c.duration_min for c in chunks)
 
     write_summary = None

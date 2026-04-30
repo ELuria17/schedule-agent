@@ -411,3 +411,70 @@ class TestHealthAndReset:
         p.list_events(_utc(2026, 4, 21), _utc(2026, 4, 22))
         second = fake_caldav["last_client"]
         assert first is not second, "reset() should drop the cached principal"
+
+
+# ---------- retry-on-reconnect (ROADBLOCKS §I5) ----------
+
+class TestRetryOnReconnect:
+    def test_keepalive_timeout_recovers_via_reset_and_retry(self, monkeypatch):
+        """A stale-connection error on the first call should silently reset
+        the principal and retry once. Caller sees a successful result."""
+        from urllib3.exceptions import ProtocolError
+
+        attempt = {"n": 0}
+        good_cals = [_FakeCalendar("Study Blocks")]
+
+        def factory(*, url, username, password):
+            attempt["n"] += 1
+            client = _FakeClient(_FakePrincipal(good_cals))
+            if attempt["n"] == 1:
+                # Boom on the first principal() call only — second client works.
+                client.principal = lambda: (_ for _ in ()).throw(
+                    ProtocolError("keepalive timeout")
+                )
+            return client
+
+        monkeypatch.setattr(caldav_mod.caldav, "DAVClient", factory)
+        p = ICloudCalDAVProvider(username="u", app_password="pw",
+                                 write_calendar_name="Study Blocks")
+        # Should not raise; the decorator catches the ProtocolError, calls
+        # reset(), and re-enters list_events which builds a fresh client.
+        events = p.list_events(_utc(2026, 4, 21), _utc(2026, 4, 22))
+        assert events == []
+        assert attempt["n"] == 2  # one bad client + one good replacement
+
+    def test_non_connection_error_does_not_retry(self, monkeypatch):
+        """Auth / 4xx style errors should propagate on the first attempt —
+        retrying them is just wasted round trips and could lock an account."""
+        attempt = {"n": 0}
+
+        def factory(*, url, username, password):
+            attempt["n"] += 1
+            raise PermissionError("401 unauthorized")
+
+        monkeypatch.setattr(caldav_mod.caldav, "DAVClient", factory)
+        p = ICloudCalDAVProvider(username="u", app_password="pw")
+        with pytest.raises(PermissionError):
+            p.list_events(_utc(2026, 4, 21), _utc(2026, 4, 22))
+        assert attempt["n"] == 1  # exactly one attempt — no retry
+
+    def test_second_failure_propagates(self, monkeypatch):
+        """If reset+retry also hits a connection error, the second one bubbles
+        up so the caller can decide what to do (mark at-risk, alert, etc)."""
+        from urllib3.exceptions import ProtocolError
+
+        attempt = {"n": 0}
+
+        def factory(*, url, username, password):
+            attempt["n"] += 1
+            client = _FakeClient(_FakePrincipal([]))
+            client.principal = lambda: (_ for _ in ()).throw(
+                ProtocolError("still broken")
+            )
+            return client
+
+        monkeypatch.setattr(caldav_mod.caldav, "DAVClient", factory)
+        p = ICloudCalDAVProvider(username="u", app_password="pw")
+        with pytest.raises(ProtocolError):
+            p.list_events(_utc(2026, 4, 21), _utc(2026, 4, 22))
+        assert attempt["n"] == 2  # one initial + one retry, then bubble
