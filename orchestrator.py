@@ -1103,6 +1103,86 @@ async def tasks_reject_endpoint(task_id: int, request: Request, replan_token: Op
     return {"task": t}
 
 
+# --- Schedule read (fast: no solver invocation, no calendar network) ---
+# /api/solver/resolve?dry_run=1 re-plans on demand (slow). The native iPhone +
+# Mac apps want a cheap, frequent read for the "Today" view, so this endpoint
+# returns the cached chunks already in the scheduled_chunks table joined with
+# their task titles. The window is whatever the caller asks for; default is
+# the next 7 days starting now.
+@app.get("/api/schedule")
+async def schedule_endpoint(request: Request, replan_token: Optional[str] = Cookie(default=None)):
+    _require_auth(request, replan_token)
+    from datetime import timezone as _tz
+    now = datetime.now(_tz.utc)
+    qp = request.query_params
+
+    def _parse(name: str, default: datetime) -> datetime:
+        raw = qp.get(name)
+        if not raw:
+            return default
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(400, f"{name} must be ISO 8601, got {raw!r}")
+
+    start = _parse("start", now)
+    end = _parse("end", now + timedelta(days=7))
+    if end <= start:
+        raise HTTPException(400, "end must be after start")
+
+    # Query scheduled_chunks joined with tasks. Cheap: indexed on (start_ts, end_ts).
+    with _config_mod.connect() as conn:
+        rows = conn.execute(
+            """SELECT sc.task_id, sc.start_ts, sc.end_ts, t.title, t.notes
+               FROM scheduled_chunks sc
+               JOIN tasks t ON t.id = sc.task_id
+               WHERE sc.start_ts >= ? AND sc.start_ts < ?
+               ORDER BY sc.start_ts ASC""",
+            (start.isoformat().replace("+00:00", "Z"),
+             end.isoformat().replace("+00:00", "Z")),
+        ).fetchall()
+    chunks = []
+    for r in rows:
+        s = datetime.fromisoformat(r["start_ts"].replace("Z", "+00:00"))
+        e = datetime.fromisoformat(r["end_ts"].replace("Z", "+00:00"))
+        chunks.append({
+            "task_id": r["task_id"],
+            "title": r["title"],
+            "start": r["start_ts"],
+            "end": r["end_ts"],
+            "duration_min": int((e - s).total_seconds() / 60),
+            "notes": r["notes"] or "",
+        })
+
+    # at-risk list comes from the most recent solver run's snapshot.
+    at_risk = []
+    if _LAST_AT_RISK:
+        # Hydrate task titles + missing-min summary by reading the latest
+        # solver_log entry; that's where the per-task duration_needed lives.
+        recent = history.list_solver_runs(limit=1)
+        if recent and isinstance(recent[0], dict):
+            entry = recent[0]
+            for risk_id in _LAST_AT_RISK:
+                t = tasks_mod.get(int(risk_id))
+                if t is None:
+                    continue
+                at_risk.append({
+                    "task_id": t["id"],
+                    "title": t["title"],
+                    "duration_needed_min": int(t["duration_min"]),
+                    "duration_placed_min": 0,  # detailed split not retained; 0 is "unknown placed"
+                    "reason": "see at-risk list from latest solver run",
+                })
+
+    return {
+        "now_utc": now.isoformat().replace("+00:00", "Z"),
+        "window_start": start.isoformat().replace("+00:00", "Z"),
+        "window_end": end.isoformat().replace("+00:00", "Z"),
+        "chunks": chunks,
+        "at_risk": at_risk,
+    }
+
+
 # --- iOS Shortcut (kept for backwards compat) ---
 @app.post("/replan")
 async def replan(request: Request):
