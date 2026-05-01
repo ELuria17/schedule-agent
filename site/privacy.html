@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — AutoPlan</title>
+<meta name="description" content="What AutoPlan sees, what it sends, and what it doesn't. Self-hosted by design — your tasks and calendar stay on your own machine.">
+<link rel="icon" type="image/png" href="assets/autoplan-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --canvas:      oklch(0.985 0.004 80);
+    --canvas-2:    oklch(0.97  0.006 80);
+    --surface:     oklch(0.94  0.008 80);
+    --border:      oklch(0.88  0.010 80);
+    --border-soft: oklch(0.93  0.008 80);
+    --ink-1:       oklch(0.20  0.012 70);
+    --ink-2:       oklch(0.46  0.014 70);
+    --ink-3:       oklch(0.60  0.014 70);
+    --accent:      oklch(0.52  0.15  45);
+    --font-display: "Bricolage Grotesque", -apple-system, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas:    oklch(0.18 0.012 70);
+      --canvas-2:  oklch(0.22 0.012 70);
+      --surface:   oklch(0.26 0.012 70);
+      --border:    oklch(0.32 0.012 70);
+      --ink-1:     oklch(0.95 0.005 80);
+      --ink-2:     oklch(0.78 0.010 80);
+      --ink-3:     oklch(0.62 0.010 80);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-display);
+    background: var(--canvas);
+    color: var(--ink-1);
+    line-height: 1.55;
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 64px 24px 96px;
+  }
+  header {
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  header a { color: var(--ink-3); text-decoration: none; font-size: 14px; letter-spacing: 0.02em; }
+  header a:hover { color: var(--accent); }
+  h1 {
+    font-size: clamp(34px, 5vw, 48px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin: 16px 0 8px;
+  }
+  .lede {
+    color: var(--ink-2);
+    font-size: 19px;
+    margin: 0 0 8px;
+  }
+  .updated {
+    color: var(--ink-3);
+    font-size: 14px;
+    font-family: var(--font-mono);
+  }
+  h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 40px 0 12px;
+    letter-spacing: -0.01em;
+  }
+  p { margin: 0 0 16px; color: var(--ink-1); }
+  ul { margin: 0 0 16px; padding-left: 24px; }
+  li { margin: 6px 0; color: var(--ink-1); }
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--surface);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--ink-2);
+  }
+  a { color: var(--accent); }
+  .callout {
+    background: var(--canvas-2);
+    border-left: 3px solid var(--accent);
+    padding: 16px 20px;
+    margin: 24px 0;
+    border-radius: 6px;
+    color: var(--ink-2);
+    font-size: 16px;
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--ink-3);
+    font-size: 14px;
+    font-family: var(--font-mono);
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <a href="index.html">← AutoPlan</a>
+    <h1>Privacy</h1>
+    <p class="lede">What AutoPlan sees, what it sends, and what it doesn't.</p>
+    <p class="updated">Last updated: 2026-04-30</p>
+  </header>
+
+  <div class="callout">
+    AutoPlan is self-hosted. The brain runs as a small Python service on
+    your own Mac. Your task list, calendar, and notes never travel to any
+    server we operate — because we don't operate one.
+  </div>
+
+  <h2>What the app touches on your device</h2>
+  <p>The iPhone and Mac apps connect to the AutoPlan service running on your
+  Mac. To do their job they read and (with your action) modify:</p>
+  <ul>
+    <li><strong>Your task list</strong> — titles, deadlines, durations,
+        priorities, notes you've written.</li>
+    <li><strong>Your calendar</strong> — events on the calendars you point
+        AutoPlan at (iCloud, Google, Microsoft). It needs this to know
+        when you're free and to write study/work blocks.</li>
+    <li><strong>Optionally, your email</strong> — only if you turn on the
+        Gmail digest feature, only the senders you list, only to summarize.</li>
+  </ul>
+  <p>All of this lives in a SQLite database on your Mac at
+  <code>~/Library/Application Support/AutoPlan/state.db</code>
+  (or in the project folder if you installed from source).
+  No copies are sent anywhere unless you explicitly enable a provider that
+  needs them.</p>
+
+  <h2>What goes to Anthropic (Claude)</h2>
+  <p>The agent uses Anthropic's Claude API to interpret natural-language
+  requests like "I have an essay due Friday." When that happens, the
+  request you typed plus the relevant slice of your task list is sent
+  to Anthropic's servers under <em>your own</em> API key (you provide it
+  during setup). Anthropic processes it according to
+  <a href="https://www.anthropic.com/legal/privacy">their privacy policy</a>.
+  We never see your API key — it lives only in your own <code>.env</code>.</p>
+
+  <h2>What goes to Apple (notifications)</h2>
+  <p>If you enable push notifications, the app registers a device token
+  with Apple's APNs service so we can wake your iPhone or Mac when there's
+  something to know. The token is a random per-install identifier — it
+  doesn't identify you personally. The token is stored on your own
+  AutoPlan service for delivery; we don't keep a copy elsewhere.</p>
+  <p>If you uninstall the app, Apple revokes the token automatically and
+  the AutoPlan service drops it on the next failed delivery.</p>
+
+  <h2>What we don't do</h2>
+  <ul>
+    <li><strong>No analytics.</strong> No SDK that pings home with how often
+        you open the app or what you tap. The apps make HTTP requests only
+        to the AutoPlan service you configured.</li>
+    <li><strong>No advertising.</strong> The app has no ads and no ad SDKs.</li>
+    <li><strong>No third-party data sharing.</strong> The only outbound
+        connections are to: your own AutoPlan service; Anthropic (Claude);
+        Apple (APNs); and whatever calendar/task providers you configured
+        (e.g. iCloud CalDAV, Canvas, Google).</li>
+    <li><strong>No account.</strong> There is no AutoPlan account. The
+        only credential is the auth token your local service generated at
+        install — it's used to gate access and never leaves your devices.</li>
+  </ul>
+
+  <h2>Crash reports</h2>
+  <p>The app sends crash reports to Apple via the standard Apple Diagnostics
+  framework, which you can opt out of in <em>System Settings → Privacy &amp;
+  Security → Analytics &amp; Improvements</em> on each device. We see
+  aggregated crash counts in App Store Connect; the reports do not include
+  your task data.</p>
+
+  <h2>Children's privacy</h2>
+  <p>AutoPlan isn't directed at children under 13. We don't knowingly
+  collect personal information from anyone — the app is designed not to.</p>
+
+  <h2>Changes</h2>
+  <p>If anything material here changes, we'll bump the date at the top and
+  call out the change in the next release notes.</p>
+
+  <h2>Contact</h2>
+  <p>Open an issue on
+  <a href="https://github.com/ELuria17/schedule-agent">github.com/ELuria17/schedule-agent</a>
+  with anything privacy-related and we'll respond.</p>
+
+  <footer>
+    AutoPlan / Schedule Agent — self-hosted scheduler
+  </footer>
+</main>
+</body>
+</html>
