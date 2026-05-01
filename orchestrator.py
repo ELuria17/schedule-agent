@@ -4,7 +4,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from anthropic import Anthropic
@@ -1181,6 +1181,40 @@ async def schedule_endpoint(request: Request, replan_token: Optional[str] = Cook
         "chunks": chunks,
         "at_risk": at_risk,
     }
+
+
+# --- Push notification device-token registry ---
+# The native iPhone + Mac apps call this at launch (after the user grants
+# notification permission) to hand over the APNs device token they got from
+# Apple. The token sits in SQLite; the apns_notifier (when wired into
+# schedule_config.NOTIFIER) iterates these to send pushes.
+@app.post("/api/push/register")
+async def push_register_endpoint(request: Request, replan_token: Optional[str] = Cookie(default=None)):
+    _require_auth(request, replan_token)
+    body = await request.json()
+    token = (body.get("device_token") or "").strip()
+    platform = (body.get("platform") or "").strip().lower()
+    if not token:
+        raise HTTPException(400, "device_token required")
+    if platform not in ("ios", "macos"):
+        raise HTTPException(400, "platform must be 'ios' or 'macos'")
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    with _config_mod.connect() as conn:
+        conn.execute(
+            "INSERT INTO device_tokens(token, platform, registered_at, last_seen_at) "
+            "VALUES (?,?,?,?) ON CONFLICT(token) DO UPDATE SET "
+            "platform=excluded.platform, last_seen_at=excluded.last_seen_at",
+            (token, platform, now_iso, now_iso),
+        )
+    return {"ok": True}
+
+
+@app.delete("/api/push/register/{token}")
+async def push_unregister_endpoint(token: str, request: Request, replan_token: Optional[str] = Cookie(default=None)):
+    _require_auth(request, replan_token)
+    with _config_mod.connect() as conn:
+        conn.execute("DELETE FROM device_tokens WHERE token=?", (token,))
+    return {"ok": True}
 
 
 # --- iOS Shortcut (kept for backwards compat) ---

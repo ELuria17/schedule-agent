@@ -156,6 +156,17 @@ CREATE TABLE IF NOT EXISTS session_events (
     event_json TEXT NOT NULL                                 -- full envelope
 );
 CREATE INDEX IF NOT EXISTS idx_session_events_session ON session_events (session_id, seq);
+
+-- APNs device tokens for the native iPhone + Mac apps. Populated by the
+-- apps' /api/push/register call at sign-in time. The APNs notifier (when
+-- enabled — see providers/apns_notifier.py) picks tokens from here.
+CREATE TABLE IF NOT EXISTS device_tokens (
+    token TEXT PRIMARY KEY,
+    platform TEXT NOT NULL CHECK (platform IN ('ios','macos')),
+    registered_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    last_seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_platform ON device_tokens (platform);
 """
 
 _SCHEMA_VERSION = "1"
