@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy — AutoPlan</title>
-<meta name="description" content="What AutoPlan sees, what it sends, and what it doesn't. Self-hosted by design — your tasks and calendar stay on your own machine.">
+<title>Privacy — Calends</title>
+<meta name="description" content="What Calends sees, what it sends, and what it doesn't. Self-hosted by design — your tasks and calendar stay on your own machine.">
 <link rel="icon" type="image/png" href="assets/autoplan-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -113,32 +113,32 @@
 <body>
 <main>
   <header>
-    <a href="index.html">← AutoPlan</a>
+    <a href="index.html">← Calends</a>
     <h1>Privacy</h1>
-    <p class="lede">What AutoPlan sees, what it sends, and what it doesn't.</p>
+    <p class="lede">What Calends sees, what it sends, and what it doesn't.</p>
     <p class="updated">Last updated: 2026-04-30</p>
   </header>
 
   <div class="callout">
-    AutoPlan is self-hosted. The brain runs as a small Python service on
+    Calends is self-hosted. The brain runs as a small Python service on
     your own Mac. Your task list, calendar, and notes never travel to any
     server we operate — because we don't operate one.
   </div>
 
   <h2>What the app touches on your device</h2>
-  <p>The iPhone and Mac apps connect to the AutoPlan service running on your
+  <p>The iPhone and Mac apps connect to the Calends service running on your
   Mac. To do their job they read and (with your action) modify:</p>
   <ul>
     <li><strong>Your task list</strong> — titles, deadlines, durations,
         priorities, notes you've written.</li>
     <li><strong>Your calendar</strong> — events on the calendars you point
-        AutoPlan at (iCloud, Google, Microsoft). It needs this to know
+        Calends at (iCloud, Google, Microsoft). It needs this to know
         when you're free and to write study/work blocks.</li>
     <li><strong>Optionally, your email</strong> — only if you turn on the
         Gmail digest feature, only the senders you list, only to summarize.</li>
   </ul>
   <p>All of this lives in a SQLite database on your Mac at
-  <code>~/Library/Application Support/AutoPlan/state.db</code>
+  <code>~/Library/Application Support/Calends/state.db</code>
   (or in the project folder if you installed from source).
   No copies are sent anywhere unless you explicitly enable a provider that
   needs them.</p>
@@ -157,21 +157,21 @@
   with Apple's APNs service so we can wake your iPhone or Mac when there's
   something to know. The token is a random per-install identifier — it
   doesn't identify you personally. The token is stored on your own
-  AutoPlan service for delivery; we don't keep a copy elsewhere.</p>
+  Calends service for delivery; we don't keep a copy elsewhere.</p>
   <p>If you uninstall the app, Apple revokes the token automatically and
-  the AutoPlan service drops it on the next failed delivery.</p>
+  the Calends service drops it on the next failed delivery.</p>
 
   <h2>What we don't do</h2>
   <ul>
     <li><strong>No analytics.</strong> No SDK that pings home with how often
         you open the app or what you tap. The apps make HTTP requests only
-        to the AutoPlan service you configured.</li>
+        to the Calends service you configured.</li>
     <li><strong>No advertising.</strong> The app has no ads and no ad SDKs.</li>
     <li><strong>No third-party data sharing.</strong> The only outbound
-        connections are to: your own AutoPlan service; Anthropic (Claude);
+        connections are to: your own Calends service; Anthropic (Claude);
         Apple (APNs); and whatever calendar/task providers you configured
         (e.g. iCloud CalDAV, Canvas, Google).</li>
-    <li><strong>No account.</strong> There is no AutoPlan account. The
+    <li><strong>No account.</strong> There is no Calends account. The
         only credential is the auth token your local service generated at
         install — it's used to gate access and never leaves your devices.</li>
   </ul>
@@ -184,7 +184,7 @@
   your task data.</p>
 
   <h2>Children's privacy</h2>
-  <p>AutoPlan isn't directed at children under 13. We don't knowingly
+  <p>Calends isn't directed at children under 13. We don't knowingly
   collect personal information from anyone — the app is designed not to.</p>
 
   <h2>Changes</h2>
@@ -197,7 +197,7 @@
   with anything privacy-related and we'll respond.</p>
 
   <footer>
-    AutoPlan / Schedule Agent — self-hosted scheduler
+    Calends — self-hosted scheduler
   </footer>
 </main>
 </body>
